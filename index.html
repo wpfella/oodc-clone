@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Out of Debt Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+      }
+      /* Style date picker icon based on theme */
+      input[type="date"]::-webkit-calendar-picker-indicator {
+        filter: var(--date-picker-filter, invert(0));
+      }
+      /* Ensure date input text and picker match theme */
+      input[type="date"].custom-date-input {
+        color-scheme: var(--date-picker-color-scheme, light);
+      }
+      /* Custom select styles for cross-browser compatibility (especially Safari) */
+      .custom-select {
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+        background-position: right 0.5rem center;
+        background-repeat: no-repeat;
+        background-size: 1.5em 1.5em;
+        padding-right: 2.5rem;
+      }
+      /* Styles for AI Assistant's HTML responses */
+      .ai-response-content p {
+          margin-bottom: 0.75rem; /* 12px */
+      }
+      .ai-response-content p:last-child {
+          margin-bottom: 0;
+      }
+      .ai-response-content strong {
+          color: var(--title-color);
+          font-weight: 600;
+      }
+      .ai-response-content ul {
+          list-style-type: disc;
+          padding-left: 1.25rem; /* 20px */
+          margin-top: 0.5rem;
+          margin-bottom: 0.75rem;
+      }
+      .ai-response-content li {
+          margin-bottom: 0.25rem; /* 4px */
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.1.1/",
+    "react": "https://aistudiocdn.com/react@^19.1.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
+    "recharts": "https://aistudiocdn.com/recharts@^3.2.1",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.21.0"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
