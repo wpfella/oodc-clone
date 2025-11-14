@@ -54,7 +54,6 @@ const FrequencyConverter = () => {
         {Object.entries(conversions).map(([freq, val]) => (
           <div key={freq} className="flex justify-between p-2 bg-black/10 dark:bg-white/5 rounded-md">
             <span className="capitalize text-[var(--text-color-muted)]">{freq}</span>
-            {/* FIX: Explicitly cast `val` to a number to resolve a TypeScript error where its type was being inferred as 'unknown'. */}
             <span className="font-semibold text-[var(--text-color)]">{formatCurrency(Number(val))}</span>
           </div>
         ))}
@@ -90,7 +89,6 @@ const calculateAustralianTax = (grossAnnual: number): Record<string, number> => 
 
 const IncomeTaxCalculator = () => {
     const [grossAnnual, setGrossAnnual] = useState<number>(100000);
-    // FIX: Explicitly cast `grossAnnual` to a number to resolve a TypeScript error where its type was being inferred as 'unknown'.
     const results = calculateAustralianTax(Number(grossAnnual));
 
     const formatCurrency = (value: number) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);

@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import { AppState, AmortizationDataPoint, LoanDetails } from '../types';
 import Card from './common/Card';
 import SliderInput from './common/SliderInput';
-// FIX: Add AreaChart to imports to fix 'Cannot find name' error.
 import { AreaChart, ComposedChart, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, CartesianGrid, Area, Scatter, ReferenceDot, LineChart, Line, Label, PieChart, Pie, Cell, ReferenceArea } from 'recharts';
 import Tooltip from './common/Tooltip';
 import { InfoIcon, DownloadIcon } from './common/IconComponents';
@@ -14,6 +13,8 @@ interface Props {
   setAppState: React.Dispatch<React.SetStateAction<AppState>>;
   calculations: any;
 }
+
+const formatCurrency = (value: number) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
 
 const formatChartCurrency = (tick: number): string => {
   if (Math.abs(tick) >= 1000000) {
@@ -162,6 +163,64 @@ const CustomMonthlyTooltip: React.FC<{ active?: boolean, payload?: any[], label?
     return null;
 };
 
+const FutureEventsImpactSummary: React.FC<{ appState: AppState; calculations: any }> = ({ appState, calculations }) => {
+    const { futureChanges, futureLumpSums } = appState;
+    if (futureChanges.length === 0 && futureLumpSums.length === 0) {
+        return null;
+    }
+
+    const baselineCalculation = useMemo(() => {
+        const { surplus } = calculations;
+        const { loan, otherDebts, crownMoneyInterestRate } = appState;
+
+        if (surplus <= 0) return { termInYears: Infinity, totalInterest: Infinity };
+
+        const consolidatedAmount = otherDebts.reduce((sum, d) => sum + d.amount, 0);
+        const crownLoanForCalc = {
+            amount: (loan.amount + consolidatedAmount) - (loan.offsetBalance || 0),
+            interestRate: crownMoneyInterestRate,
+            repayment: surplus,
+            frequency: 'monthly' as const,
+            offsetBalance: 0,
+        };
+        // Calculate baseline WITHOUT any future events
+        return calculateAmortization(crownLoanForCalc, { strategy: 'crown' });
+
+    }, [appState, calculations]);
+
+    const actualCalculation = calculations.crownMoneyLoanCalculation;
+
+    if (baselineCalculation.termInYears === Infinity || actualCalculation.termInYears === Infinity) {
+        return null; // Don't show if one is unpayable
+    }
+
+    const termDiff = baselineCalculation.termInYears - actualCalculation.termInYears;
+    const interestDiff = baselineCalculation.totalInterest - actualCalculation.totalInterest;
+
+    if (Math.abs(termDiff) < 1/24 && Math.abs(interestDiff) < 100) {
+        return null; // Don't show for negligible impact
+    }
+    
+    const isPositive = termDiff > 0;
+    const termText = `${Math.abs(termDiff).toFixed(1)} years ${isPositive ? 'sooner' : 'later'}`;
+    const interestText = `${formatCurrency(Math.abs(interestDiff))} in interest`;
+    
+    return (
+        <div className={`p-4 rounded-lg border mb-6 ${isPositive ? 'bg-[var(--color-positive-bg)] border-[var(--color-positive-text)]' : 'bg-[var(--color-negative-bg)] border-[var(--color-negative-text)]'}`}>
+            <div className="flex items-center gap-3">
+                <InfoIcon className={`h-6 w-6 flex-shrink-0 ${isPositive ? 'text-[var(--color-positive-text)]' : 'text-[var(--color-negative-text)]'}`} />
+                <div>
+                    <h4 className={`font-bold ${isPositive ? 'text-[var(--color-positive-text)]' : 'text-[var(--color-negative-text)]'}`}>Future Events Included</h4>
+                    <p className={`text-sm ${isPositive ? 'text-[var(--color-positive-text)]' : 'text-[var(--color-negative-text)]'}`}>
+                        Based on your {futureChanges.length > 0 ? `${futureChanges.length} planned change(s)` : ''}{futureChanges.length > 0 && futureLumpSums.length > 0 ? ' and ' : ''}{futureLumpSums.length > 0 ? `${futureLumpSums.length} lump sum event(s)` : ''}, your Crown Money forecast has been adjusted.
+                        You will be debt-free <strong>{termText}</strong> and {isPositive ? 'save' : 'pay'} an extra <strong>{interestText}</strong>.
+                    </p>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => {
   const [additionalMonthlyIncome, setAdditionalMonthlyIncome] = useState(0);
@@ -254,8 +313,6 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
   const handleRateChange = (value: number) => {
     setAppState(prev => ({ ...prev, crownMoneyInterestRate: value }));
   };
-
-  const formatCurrency = (value: number) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
   
   const isBankLoanValid = bankLoanCalculation.termInYears !== Infinity;
   const isCrownLoanValid = crownMoneyLoanCalculation.termInYears !== Infinity;
@@ -342,7 +399,9 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
       showInterestAmount?: boolean;
       principalWithConsolidation?: number;
       principalWithoutConsolidation?: number;
-  }> = ({ title, homeLoanPrincipal, otherDebtsPrincipal = 0, homeLoanInterest, otherDebtsInterest, usePrincipalAsDenominator = false, showInterestAmount = true, principalWithConsolidation, principalWithoutConsolidation }) => {
+      displayMode?: 'default' | 'largePrincipal';
+  }> = ({ title, homeLoanPrincipal, otherDebtsPrincipal = 0, homeLoanInterest, otherDebtsInterest, usePrincipalAsDenominator = false, showInterestAmount = true, principalWithConsolidation, principalWithoutConsolidation, displayMode = 'default' }) => {
+      const formatCurrency = (value: number) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
       const totalPrincipal = homeLoanPrincipal + otherDebtsPrincipal;
       const totalInterest = homeLoanInterest + otherDebtsInterest;
       const data = [
@@ -355,8 +414,8 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
 
       return (
           <div className="text-center p-2 bg-black/5 dark:bg-white/5 rounded-lg flex flex-col justify-between">
-              <h5 className={`font-semibold ${title.includes('Crown') ? 'text-lg' : 'text-sm'}`}>{title}</h5>
-              <div className="w-full h-40 relative">
+              <h5 className={`font-semibold ${title.includes('Crown') ? 'text-lg' : 'text-base'}`}>{title}</h5>
+              <div className={`w-full relative ${displayMode === 'largePrincipal' ? 'h-52' : 'h-40'}`}>
                   <ResponsiveContainer>
                       <PieChart>
                           <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="60%" outerRadius="80%" paddingAngle={2}>
@@ -366,11 +425,31 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
                       </PieChart>
                   </ResponsiveContainer>
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                      <span className="text-2xl font-bold" style={{color: 'var(--chart-color-interest)'}}>{interestPercent.toFixed(0)}%</span>
+                      <span className={`font-bold ${displayMode === 'largePrincipal' ? 'text-3xl' : 'text-2xl'}`} style={{color: 'var(--chart-color-interest)'}}>{interestPercent.toFixed(0)}%</span>
                       <span className="text-xs text-[var(--text-color-muted)]">Interest</span>
                   </div>
               </div>
-              <div className="text-xs text-left px-1 mt-1 space-y-1">
+              
+              {displayMode === 'largePrincipal' ? (
+                <>
+                    <div className="flex justify-between items-baseline mt-2 px-2">
+                        <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full" style={{backgroundColor: 'var(--chart-color-principal)'}}></div>
+                            <span className="text-xl font-semibold text-[var(--text-color-muted)]">
+                                {otherDebtsPrincipal > 0 ? 'Home Loan' : 'Principal'}
+                            </span>
+                        </div>
+                        <span className="text-5xl font-bold text-[var(--text-color)]">{formatCurrency(homeLoanPrincipal)}</span>
+                    </div>
+                    {otherDebtsPrincipal > 0 && (
+                        <div className="flex justify-between items-baseline mt-1 px-2">
+                            <span className="text-lg font-semibold text-[var(--text-color-muted)] pl-5">Other Debts</span>
+                            <span className="text-3xl font-bold text-[var(--text-color)]">{formatCurrency(otherDebtsPrincipal)}</span>
+                        </div>
+                    )}
+                </>
+              ) : (
+                <div className="text-xs text-left px-1 mt-1 space-y-1">
                   {principalWithConsolidation && typeof principalWithoutConsolidation !== 'undefined' ? (
                       <>
                           <div className="flex items-center">
@@ -419,6 +498,7 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
                       null
                   )}
               </div>
+              )}
           </div>
       );
   };
@@ -569,7 +649,7 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
                             <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
                             <XAxis dataKey="month" type="number" domain={[0, 12]} ticks={monthTicks} interval={0} stroke="var(--text-color)" tick={{ fontSize: 12 }} label={{ value: 'Months', position: 'insideBottom', offset: -10, fill: 'var(--text-color-muted)' }} />
                             <YAxis stroke="var(--text-color)" tickFormatter={formatChartCurrency} tick={{ fontSize: 12 }} domain={['dataMin - 1000', 'dataMax + 1000']} allowDataOverflow />
-                            <RechartsTooltip content={<CustomMonthlyTooltip formatter={formatChartCurrency} />} />
+                            <RechartsTooltip content={<CustomMonthlyTooltip formatter={formatCurrency} />} />
                             <Legend wrapperStyle={{fontSize: "14px", color: "var(--text-color-muted)"}} verticalAlign="top" />
                             <Area type="monotone" name="Bank (Home Loan Only)" dataKey="Bank" stroke="var(--chart-color-bank)" fill="url(#colorBank12m)" strokeWidth={2} dot={true} />
                             <Area type="monotone" name="Crown Money (Total Debt)" dataKey="Crown Money" stroke="var(--chart-color-crown)" fill="url(#colorCrown12m)" strokeWidth={3} dot={true} />
@@ -650,6 +730,7 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
                             homeLoanInterest={bankYear1.homeLoanInterest} 
                             otherDebtsInterest={bankYear1.otherDebtsInterest} 
                             showInterestAmount={false} 
+                            displayMode="largePrincipal"
                         />
                         <DonutChartCard 
                             title="Crown Money 🏆" 
@@ -659,6 +740,7 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
                             showInterestAmount={false} 
                             principalWithConsolidation={appState.otherDebts.length > 0 ? crownYear1.principal : undefined}
                             principalWithoutConsolidation={appState.otherDebts.length > 0 ? calculations.crownMoneyLoanCalculation.year1PrimaryOnlyPrincipalPaid : undefined}
+                            displayMode="largePrincipal"
                         />
                     </div>
                 </div>
@@ -725,7 +807,7 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)"/>
                                             <XAxis type="category" dataKey="name" hide={true} />
                                             <YAxis stroke="var(--text-color)" tickFormatter={formatChartCurrency} label={{ value: '$', angle: -90, position: 'insideLeft', fill: 'var(--text-color-muted)' }} />
-                                            <RechartsTooltip content={<CustomBarTooltip formatter={(value: number) => formatCurrency(value)} unit="currency" />} cursor={{fill: 'var(--card-bg-color)'}} />
+                                            <RechartsTooltip content={<CustomBarTooltip formatter={(value: number) => formatCurrency(value)} unit="currency" />} cursor={{fill: 'var(--card-bg-color)'}}/>
                                             <Legend verticalAlign="top" wrapperStyle={{color: "var(--text-color-muted)"}}/>
                                             <Bar dataKey="Bank" fill="var(--chart-color-bank)" barSize={60} />
                                             <Bar dataKey="Crown Money" fill="var(--chart-color-crown)" barSize={60} />
@@ -808,6 +890,7 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
 
   return (
     <div className="animate-fade-in space-y-6">
+      <FutureEventsImpactSummary appState={appState} calculations={calculations} />
       <Accordion items={accordionItems} />
     </div>
   );

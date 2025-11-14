@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { AppState, Tab, ExpenseItem, InvestmentProperty, InvestmentPropertyExpense, FutureChange, FutureLumpSum, Person, IncomeItem, LoanDetails, Frequency, SavedScenario } from './types';
 import Tab1_CurrentLoan from './components/Tab1_CurrentLoan';
@@ -10,7 +9,7 @@ import Tab_InvestmentOODC from './components/Tab_InvestmentOODC';
 import Tab_DebtRecycling from './components/Tab_DebtRecycling';
 import Tab_In2Wealth from './components/Tab_In2Wealth';
 import Tab5_Summary from './components/Tab5_Summary';
-import { CrownLogo, SunIcon, MoonIcon, PrintIcon, DownloadIcon, SpeakerOnIcon, SpeakerOffIcon, CalculatorIcon, CodeBracketIcon, TrashIcon, CameraIcon, UndoIcon, SaveIcon, FolderOpenIcon, UploadIcon } from './components/common/IconComponents';
+import { CrownLogo, SunIcon, MoonIcon, PrintIcon, DownloadIcon, SpeakerOnIcon, SpeakerOffIcon, CalculatorIcon, CodeBracketIcon, TrashIcon, CameraIcon, UndoIcon, SaveIcon, FolderOpenIcon, UploadIcon, ClipboardIcon } from './components/common/IconComponents';
 import { useMortgageCalculations } from './hooks/useMortgageCalculations';
 import Toast from './components/common/Toast';
 import Modal from './components/common/Modal';
@@ -18,6 +17,7 @@ import AdvancedCalculator from './components/common/AdvancedCalculator';
 import { useSpeechSynthesizer } from './hooks/useSpeechSynthesizer';
 import Assistant from './components/Assistant';
 import LoginScreen from './components/LoginScreen';
+import Notepad from './components/Notepad';
 
 const darkPalette = {
     '--bg-color': '#250B40',
@@ -154,6 +154,7 @@ export const initialAppState: AppState = {
   debtRecyclingLoanInterestRate: 6.5,
   marginalTaxRate: 32.5,
   debtRecyclingPercentage: 100,
+  notepadContent: '',
 };
 
 export const emptyAppState: AppState = {
@@ -191,6 +192,7 @@ export const emptyAppState: AppState = {
   debtRecyclingLoanInterestRate: 6.5,
   marginalTaxRate: 32.5,
   debtRecyclingPercentage: 100,
+  notepadContent: '',
 };
 
 const tabExplanations: Record<Tab, string> = {
@@ -232,6 +234,7 @@ const App: React.FC = () => {
   const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
   const [scenarioNameInput, setScenarioNameInput] = useState('');
   const [savedScenarios, setSavedScenarios] = useState<SavedScenario[]>([]);
+  const [isNotepadOpen, setIsNotepadOpen] = useState(false);
   const importFileInputRef = useRef<HTMLInputElement>(null);
   
 
@@ -1019,7 +1022,7 @@ const App: React.FC = () => {
       <div className="max-w-7xl mx-auto">
         <header className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8 pb-4 border-b border-[var(--border-color)] print:hidden">
           <CrownLogo className="h-12 w-auto text-[var(--text-color)]" />
-          <div className="flex items-center gap-2 sm:gap-4 flex-wrap justify-center">
+          <div className="flex items-center gap-2 overflow-x-auto flex-nowrap py-1 pr-2">
               <button onClick={handleOpenSaveModal} title="Save Scenario" className={buttonBaseClasses}>
                   <SaveIcon className="h-5 w-5"/>
                   <span className="text-sm font-semibold hidden sm:inline">Save Scenario</span>
@@ -1049,6 +1052,10 @@ const App: React.FC = () => {
                <button onClick={() => setIsCalculatorOpen(true)} title="Advanced Calculator" className={buttonBaseClasses}>
                   <CalculatorIcon className="h-5 w-5"/>
                   <span className="text-sm font-semibold hidden sm:inline">Calculator</span>
+               </button>
+               <button onClick={() => setIsNotepadOpen(prev => !prev)} title="Open Notepad" className={buttonBaseClasses}>
+                   <ClipboardIcon className="h-5 w-5"/>
+                   <span className="text-sm font-semibold hidden sm:inline">Notepad</span>
                </button>
                <button onClick={handleExplain} title="Explain this Tab" className={buttonBaseClasses}>
                   {isSpeaking ? <SpeakerOffIcon className="h-5 w-5"/> : <SpeakerOnIcon className="h-5 w-5"/>}
@@ -1310,6 +1317,13 @@ const App: React.FC = () => {
               </button>
           </div>
       </Modal>
+      
+      <Notepad
+        isOpen={isNotepadOpen}
+        onClose={() => setIsNotepadOpen(false)}
+        content={appState.notepadContent}
+        setContent={(newContent) => setAppState(prev => ({...prev, notepadContent: newContent}))}
+      />
       
       <Assistant appState={appState} calculations={calculations} activeTab={tabs.find(t => t.id === activeTab)?.label || 'Current Loan'} />
 

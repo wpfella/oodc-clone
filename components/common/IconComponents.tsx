@@ -221,3 +221,17 @@ export const FolderOpenIcon = (props: React.SVGProps<SVGSVGElement>) => (
       <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0A2.25 2.25 0 012.25 7.5h19.5a2.25 2.25 0 012.25 2.25m-16.5 0v_6c0 .621.504 1.125 1.125 1.125h14.25c.621 0 1.125-.504 1.125-1.125v-6" />
     </svg>
 );
+
+export const ClipboardIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    </svg>
+);
+
+export const PercentIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 7.5l9 9" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75a2.25 2.25 0 11-3.182-3.182 2.25 2.25 0 013.182 3.182z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 17.25a2.25 2.25 0 11-3.182-3.182 2.25 2.25 0 013.182 3.182z" />
+    </svg>
+);

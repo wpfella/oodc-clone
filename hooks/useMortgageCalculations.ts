@@ -142,25 +142,13 @@ export const calculateAmortization = (
     for (let month = 1; month <= MAX_MONTHS; month++) {
         // Apply lump sum changes at the start of the month
         if (lumpSumChangesByMonth[month - 1]) {
-            const changeAmount = lumpSumChangesByMonth[month - 1]; // This is signed (+ for income, - for expense)
+            const changeAmount = lumpSumChangesByMonth[month - 1];
             
             if (strategy === 'crown') {
                 // Crown strategy: directly impact principal
                 balance -= changeAmount; // Income reduces balance, expense increases it
-            } else { // Bank strategy
-                if (changeAmount > 0) { // Income
-                    currentOffsetBalance += changeAmount;
-                } else { // Expense (redraw)
-                    const expenseAmount = Math.abs(changeAmount);
-                    if (currentOffsetBalance >= expenseAmount) {
-                        currentOffsetBalance -= expenseAmount;
-                    } else {
-                        const remainder = expenseAmount - currentOffsetBalance;
-                        currentOffsetBalance = 0;
-                        balance += remainder; // Redraw from loan
-                    }
-                }
             }
+            // Bank scenario is intentionally unaffected as per user request
 
             if (balance < 0) balance = 0;
         }
@@ -194,8 +182,13 @@ export const calculateAmortization = (
         const interestPaid = (balance - effectiveOffset) * monthlyRate;
         
         const surplusChangeForMonth = futureChangesByMonth[month - 1] || 0;
-        const currentExtraPayment = extraMonthlyPayment + surplusChangeForMonth + netInvestmentReturn;
-        const totalPayment = currentMonthlyRepayment + Math.max(0, currentExtraPayment);
+        let totalPayment = currentMonthlyRepayment;
+
+        if (strategy === 'crown') {
+            const adjustedSurplus = currentMonthlyRepayment + extraMonthlyPayment + surplusChangeForMonth + netInvestmentReturn;
+            totalPayment = Math.max(0, adjustedSurplus);
+        }
+        // Bank strategy repayment is fixed and intentionally unaffected by future changes
 
         if (totalPayment <= interestPaid && month > 12 && Object.keys(futureChangesByMonth).length === 0 && extraMonthlyPayment === 0) {
              return { termInYears: Infinity, totalInterest: Infinity, totalPaid: Infinity, amortizationSchedule };
@@ -298,7 +291,8 @@ export const useMortgageCalculations = (appState: AppState) => {
         const totalMonthlyExpenses = totalMonthlyLivingExpenses + Math.abs(Math.min(0, investmentPropertiesNetCashflow));
         
         // For Crown, the surplus is calculated BEFORE any debt repayments, as the surplus is what pays the debts.
-        const surplus = totalMonthlyIncome - totalMonthlyLivingExpenses;
+        // It's all income sources minus all living/investment expenses.
+        const surplus = totalMonthlyIncome - totalMonthlyExpenses;
 
         return {
             investmentPropertiesNetCashflow,
@@ -311,99 +305,48 @@ export const useMortgageCalculations = (appState: AppState) => {
     }, [incomes, expenses, investmentProperties, otherDebts]);
 
     const bankLoanCalculation = useMemo(() => {
-        // 1. Calculate primary loan amortization (netted against offset)
+        // This calculation shows the client's current home loan scenario in isolation.
+        // As per user request, it is NOT affected by future income/expense changes.
+        
         const primaryLoanDetails = { 
             ...loan, 
             amount: loan.amount - (loan.offsetBalance || 0),
             offsetBalance: 0, 
         };
-        // The bank's calculation should NOT be affected by future income/expense changes, only by lump sums.
-        const primaryLoanCalc = calculateAmortization(primaryLoanDetails, { futureLumpSums, strategy: 'bank' });
+        const primaryLoanCalc = calculateAmortization(primaryLoanDetails, { strategy: 'bank' });
     
-        // 2. Calculate amortization for each "Other Debt" separately
-        const otherDebtCalcs = otherDebts.map(debt => {
-            return calculateAmortization({
-                amount: debt.amount,
-                interestRate: debt.interestRate,
-                repayment: debt.repayment,
-                frequency: debt.frequency,
-                offsetBalance: 0,
-                loanTerm: debt.remainingTerm,
-            }, { strategy: 'bank' });
-        });
-    
-        // 3. Combine results for a total portfolio view
-        const allSchedules = [primaryLoanCalc, ...otherDebtCalcs];
-        const maxMonths = Math.max(...allSchedules.map(calc => calc.amortizationSchedule.length));
-    
-        const isUnpayable = allSchedules.some(calc => calc.termInYears === Infinity);
-        if (isUnpayable || maxMonths === 0) {
+        if (primaryLoanCalc.termInYears === Infinity) {
             return {
                 termInYears: Infinity, totalInterest: Infinity, totalPaid: Infinity, amortizationSchedule: [],
-                primaryLoanInterest: Infinity, otherDebtsInterest: Infinity,
-                year1PrimaryLoanInterest: Infinity, year1OtherDebtsInterest: Infinity,
-                bankOtherDebtsMaxTerm: Infinity,
+                primaryLoanInterest: Infinity, otherDebtsInterest: 0,
+                year1PrimaryLoanInterest: Infinity, year1OtherDebtsInterest: 0,
+                bankOtherDebtsMaxTerm: 0,
                 year1PrimaryLoanPrincipal: 0, year1OtherDebtsPrincipal: 0
             };
         }
     
-        const combinedSchedule: AmortizationDataPoint[] = [];
-        let totalInterest = 0;
-        let totalPaid = 0;
-    
-        for (let month = 1; month <= maxMonths; month++) {
-            let monthInterest = 0;
-            let monthPrincipal = 0;
-            let monthRemaining = 0;
-    
-            allSchedules.forEach(calc => {
-                const dataPoint = calc.amortizationSchedule[month - 1];
-                if (dataPoint) {
-                    monthInterest += dataPoint.interestPaid;
-                    monthPrincipal += dataPoint.principalPaid;
-                    monthRemaining += dataPoint.remainingBalance;
-                }
-            });
-            
-            totalInterest += monthInterest;
-            totalPaid += monthInterest + monthPrincipal;
-    
-            combinedSchedule.push({
-                month,
-                interestPaid: primaryLoanCalc.amortizationSchedule[month-1]?.interestPaid ?? 0,
-                principalPaid: primaryLoanCalc.amortizationSchedule[month-1]?.principalPaid ?? 0,
-                remainingBalance: primaryLoanCalc.amortizationSchedule[month-1]?.remainingBalance ?? 0,
-                offsetBalance: primaryLoanCalc.amortizationSchedule[month-1]?.offsetBalance ?? 0,
-                totalInterestPaid: monthInterest,
-                totalPrincipalPaid: monthPrincipal,
-                totalRemainingBalance: monthRemaining,
-            });
-        }
-        
-        const otherDebtsInterest = otherDebtCalcs.reduce((sum, calc) => sum + calc.totalInterest, 0);
         const year1PrimaryLoanInterest = primaryLoanCalc.amortizationSchedule.slice(0, 12).reduce((sum, item) => sum + item.interestPaid, 0);
-        const year1OtherDebtsInterest = otherDebtCalcs.reduce((total, calc) => 
-            total + calc.amortizationSchedule.slice(0, 12).reduce((sum, item) => sum + item.interestPaid, 0), 0);
-        const bankOtherDebtsMaxTerm = Math.max(0, ...otherDebtCalcs.map(c => c.termInYears));
-
         const year1PrimaryLoanPrincipal = primaryLoanCalc.amortizationSchedule.slice(0, 12).reduce((sum, item) => sum + item.principalPaid, 0);
-        const year1OtherDebtsPrincipal = otherDebtCalcs.reduce((total, calc) => 
-            total + calc.amortizationSchedule.slice(0, 12).reduce((sum, item) => sum + item.principalPaid, 0), 0);
 
         return {
-            termInYears: maxMonths / 12, // The true term is when the LAST debt is paid
-            totalInterest: totalInterest,
-            totalPaid: totalPaid,
-            amortizationSchedule: combinedSchedule,
+            termInYears: primaryLoanCalc.termInYears,
+            totalInterest: primaryLoanCalc.totalInterest,
+            totalPaid: primaryLoanCalc.totalPaid,
+            amortizationSchedule: primaryLoanCalc.amortizationSchedule.map(point => ({
+                ...point,
+                totalInterestPaid: point.interestPaid,
+                totalPrincipalPaid: point.principalPaid,
+                totalRemainingBalance: point.remainingBalance,
+            })),
             primaryLoanInterest: primaryLoanCalc.totalInterest,
-            otherDebtsInterest,
+            otherDebtsInterest: 0,
             year1PrimaryLoanInterest,
-            year1OtherDebtsInterest,
-            bankOtherDebtsMaxTerm,
+            year1OtherDebtsInterest: 0,
+            bankOtherDebtsMaxTerm: 0,
             year1PrimaryLoanPrincipal,
-            year1OtherDebtsPrincipal,
+            year1OtherDebtsPrincipal: 0,
         };
-    }, [loan, otherDebts, futureLumpSums]);
+    }, [loan]);
 
     const crownMoneyLoanCalculation = useMemo(() => {
         const { surplus } = budgetCalculations;
@@ -641,6 +584,34 @@ export const useMortgageCalculations = (appState: AppState) => {
         return { wealthProjection, retirementWealthProjection, wealthCalcs };
     }, [budgetCalculations, crownMoneyLoanCalculation, investmentAmountPercentage, investmentGrowthRate, idealRetirementAge, youngestPersonAge, loan.propertyValue, propertyGrowthRate, bankLoanCalculation.termInYears]);
 
+    const debtRecyclingWealthProjection = useMemo(() => {
+        if (debtRecyclingCalculation.termInYears === Infinity) {
+            return { totalPortfolioValue: 0 };
+        }
+        const { surplus } = budgetCalculations;
+        const payoffAge = youngestPersonAge + debtRecyclingCalculation.termInYears;
+        const investmentYears = idealRetirementAge - payoffAge;
+
+        if (investmentYears <= 0) {
+            return { totalPortfolioValue: debtRecyclingCalculation.finalInvestmentPortfolioValue };
+        }
+
+        const initialPortfolio = debtRecyclingCalculation.finalInvestmentPortfolioValue;
+        const futureValueOfInitialPortfolio = initialPortfolio * Math.pow(1 + investmentGrowthRate / 100, investmentYears);
+
+        const monthlyInvestment = surplus * (investmentAmountPercentage / 100);
+        const investmentMonths = investmentYears * 12;
+        const monthlyGrowthRate = Math.pow(1 + (investmentGrowthRate / 100), 1 / 12) - 1;
+
+        const futureValueOfAnnuity = monthlyGrowthRate > 0
+            ? monthlyInvestment * ((Math.pow(1 + monthlyGrowthRate, investmentMonths) - 1) / monthlyGrowthRate)
+            : monthlyInvestment * investmentMonths;
+
+        const totalPortfolioValue = futureValueOfInitialPortfolio + futureValueOfAnnuity;
+
+        return { totalPortfolioValue };
+    }, [debtRecyclingCalculation, budgetCalculations, youngestPersonAge, idealRetirementAge, investmentGrowthRate, investmentAmountPercentage]);
+
     const netWorthProjection = useMemo(() => {
         const { wealthCalcs } = wealthCalculations;
         const projection: {age: number, bank: number, crown: number}[] = [];
@@ -794,11 +765,12 @@ export const useMortgageCalculations = (appState: AppState) => {
         debtRecyclingCalculation,
         investmentLoanCalculations,
         ...wealthCalculations,
+        debtRecyclingWealthProjection,
         netWorthProjection,
         totalDebtData,
         ...retirementEquity,
         ...bankRetirementPosition,
         totalInitialDebt,
         totalInitialNetDebt,
-    }), [people, budgetCalculations, bankLoanCalculation, crownMoneyLoanCalculation, debtRecyclingCalculation, investmentLoanCalculations, wealthCalculations, netWorthProjection, totalDebtData, retirementEquity, bankRetirementPosition, totalInitialDebt, totalInitialNetDebt]);
+    }), [people, budgetCalculations, bankLoanCalculation, crownMoneyLoanCalculation, debtRecyclingCalculation, investmentLoanCalculations, wealthCalculations, debtRecyclingWealthProjection, netWorthProjection, totalDebtData, retirementEquity, bankRetirementPosition, totalInitialDebt, totalInitialNetDebt]);
 };

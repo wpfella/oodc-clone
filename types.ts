@@ -114,6 +114,7 @@ export interface AppState {
   debtRecyclingLoanInterestRate: number;
   marginalTaxRate: number;
   debtRecyclingPercentage: number;
+  notepadContent: string;
 }
 
 export enum Tab {

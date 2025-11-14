@@ -3,7 +3,7 @@ import { AppState, OtherDebt } from '../types';
 import Card from './common/Card';
 import SliderInput from './common/SliderInput';
 import EditableField from './common/EditableField';
-import { UsersIcon, BanknotesIcon, ChartBarIcon, InfoIcon } from './common/IconComponents';
+import { UsersIcon, BanknotesIcon, ChartBarIcon, InfoIcon, PercentIcon } from './common/IconComponents';
 import Tooltip from './common/Tooltip';
 import { calculatePIPayment } from '../hooks/useMortgageCalculations';
 
@@ -142,6 +142,7 @@ const Tab1_CurrentLoan: React.FC<Props> = ({ appState, setAppState, calculations
 
   const netLoanAmount = Math.max(0, loan.amount - (loan.offsetBalance || 0));
   const minPIRepayment = calculatePIPayment(netLoanAmount, loan.interestRate, 30, loan.frequency);
+  const lvr = loan.propertyValue > 0 ? (loan.amount / loan.propertyValue) * 100 : 0;
 
   const handleRepaymentBlur = () => {
     if (loan.repayment < minPIRepayment) {
@@ -249,6 +250,23 @@ const Tab1_CurrentLoan: React.FC<Props> = ({ appState, setAppState, calculations
                         <p className="text-[var(--text-color-muted)] print:text-gray-600">Years</p>
                     </div>
                     <div className="p-4 bg-black/10 dark:bg-white/5 rounded-lg">
+                        <PercentIcon className="h-8 w-8 mx-auto text-[var(--title-color)] mb-2"/>
+                        <div className='flex items-center justify-center gap-2'>
+                           <h4 className="text-sm text-[var(--text-color-muted)] print:text-gray-600">LVR</h4>
+                           <Tooltip text="Loan to Value Ratio (LVR) is your loan amount as a percentage of your property value. Lenders use this to assess risk. An LVR above 80% often requires Lender's Mortgage Insurance (LMI).">
+                                <InfoIcon className="h-4 w-4 text-[var(--text-color-muted)]"/>
+                           </Tooltip>
+                        </div>
+                        <p className="text-3xl font-bold text-[var(--text-color)] print:text-black">
+                            {lvr > 0 ? `${lvr.toFixed(1)}%` : 'N/A'}
+                        </p>
+                        {lvr > 0 && (
+                          <p className={`text-sm mt-1 font-semibold ${lvr > 80 ? 'text-red-400' : 'text-green-400'}`}>
+                            {lvr > 90 ? 'Very High Risk' : lvr > 80 ? 'High Risk' : 'Good'}
+                          </p>
+                        )}
+                    </div>
+                    <div className="p-4 bg-black/10 dark:bg-white/5 rounded-lg sm:col-span-2">
                         <UsersIcon className="h-8 w-8 mx-auto text-[var(--title-color)] mb-2"/>
                         <div className='flex items-center justify-center gap-2'>
                            <h4 className="text-sm text-[var(--text-color-muted)] print:text-gray-600">Debt Free By Age</h4>
@@ -256,7 +274,7 @@ const Tab1_CurrentLoan: React.FC<Props> = ({ appState, setAppState, calculations
                                 <InfoIcon className="h-4 w-4 text-[var(--text-color-muted)]"/>
                            </Tooltip>
                         </div>
-                        <div className="mt-1 space-y-1">
+                        <div className="mt-1 space-y-1 md:flex md:justify-center md:gap-6 md:space-y-0">
                           {people.map(p => (
                              <p key={p.id} className="text-xl font-bold text-[var(--text-color)] print:text-black">{p.name}: {Math.ceil(p.age + bankLoanCalculation.termInYears)}</p>
                           ))}

@@ -1,7 +1,6 @@
 import React from 'react';
 
 interface SliderInputProps {
-  // FIX: Changed label prop type from `string` to `React.ReactNode` to allow components as labels.
   label: React.ReactNode;
   value: number;
   onChange: (value: number) => void;

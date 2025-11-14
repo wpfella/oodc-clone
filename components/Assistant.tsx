@@ -31,21 +31,33 @@ const getYear1Data = (schedule: AmortizationDataPoint[]) => {
 const generateAssistantContext = (appState: AppState, calculations: any, activeTab: string): string => {
     const { 
         loan, people, investmentProperties, idealRetirementAge, payoffStrategy, futureChanges, futureLumpSums,
-        incomes, expenses, otherDebts
+        incomes, expenses, otherDebts, debtRecyclingInvestmentRate, debtRecyclingLoanInterestRate, marginalTaxRate, debtRecyclingPercentage
     } = appState;
     const { 
         bankLoanCalculation, 
         crownMoneyLoanCalculation, 
+        debtRecyclingCalculation,
         investmentLoanCalculations,
         totalMonthlyIncome,
         totalMonthlyLivingExpenses,
-        totalMonthlyExpenses,
+        surplus,
         retirementWealthProjection,
         investmentPropertiesNetCashflow
     } = calculations;
 
     const bankYear1 = getYear1Data(bankLoanCalculation.amortizationSchedule);
     const crownYear1 = getYear1Data(crownMoneyLoanCalculation.amortizationSchedule);
+
+    // Re-calculate the example numbers for the visual guide to pass to the AI
+    const year1PrincipalPaid = (debtRecyclingCalculation.amortizationSchedule || [])
+        .slice(0, 12)
+        .reduce((sum, entry) => sum + entry.principalPaid, 0);
+    const amountToRecycle = year1PrincipalPaid > 100 ? year1PrincipalPaid * (debtRecyclingPercentage / 100) : 10000;
+    const grossReturn = amountToRecycle * (debtRecyclingInvestmentRate / 100);
+    const interestCost = amountToRecycle * (debtRecyclingLoanInterestRate / 100);
+    const netProfitBeforeTax = grossReturn - interestCost;
+    const taxOnProfit = netProfitBeforeTax > 0 ? netProfitBeforeTax * (marginalTaxRate / 100) : 0;
+    const netProfit = netProfitBeforeTax - taxOnProfit;
 
     const summary = {
         activeTab: activeTab,
@@ -63,7 +75,7 @@ const generateAssistantContext = (appState: AppState, calculations: any, activeT
         budget: {
             totalMonthlyIncome: formatCurrency(totalMonthlyIncome),
             totalMonthlyLivingExpenses: formatCurrency(totalMonthlyLivingExpenses),
-            monthlySurplus: formatCurrency(totalMonthlyIncome - totalMonthlyLivingExpenses),
+            monthlySurplus: formatCurrency(surplus),
             investmentNetCashflow: formatCurrency(investmentPropertiesNetCashflow),
         },
         formulas: {
@@ -71,9 +83,29 @@ const generateAssistantContext = (appState: AppState, calculations: any, activeT
             monthlySurplus: "Total Monthly Income - Total Monthly Living Expenses",
             totalInterestSaved: "(Bank Total Interest - Crown Money Total Interest) for all loans combined.",
             yearsSaved: "Bank Payoff Years - Crown Money Payoff Years",
-            debtRecyclingNetProfit: "(Investment Returns - Investment Loan Interest) * (1 - Marginal Tax Rate)",
+            debtRecyclingNetProfit: "(Gross Investment Return - Investment Loan Interest) - Tax on Profit. Tax is calculated using the Marginal Tax Rate.",
             netWorth: "Home Equity + Investment Portfolio Value - Remaining Debt",
             investmentPower: "This is your monthly surplus (Total Income - Total Monthly Expenses), which is available for investing once your home loan is paid off with the Crown Money strategy."
+        },
+        debtRecycling: {
+            assumptions: {
+                investmentRate: debtRecyclingInvestmentRate,
+                loanInterestRate: debtRecyclingLoanInterestRate,
+                marginalTaxRate: marginalTaxRate,
+                percentageToRecycle: debtRecyclingPercentage
+            },
+            visualGuideExample: {
+                step1_monthlySurplus: formatCurrency(surplus),
+                step2_amountToRecycle: formatCurrency(amountToRecycle),
+                step3_grossReturn: formatCurrency(grossReturn),
+                step4_interestCost: formatCurrency(interestCost),
+                step4_netProfit: formatCurrency(netProfit),
+            },
+            endResult: {
+                homePayoffYears: debtRecyclingCalculation.termInYears.toFixed(1),
+                finalPortfolioValue: formatCurrency(debtRecyclingCalculation.finalInvestmentPortfolioValue),
+                passiveIncome: formatCurrency((debtRecyclingCalculation.finalInvestmentPortfolioValue * (debtRecyclingInvestmentRate / 100)) * (1 - marginalTaxRate/100) - (debtRecyclingCalculation.finalInvestmentLoanBalance * (debtRecyclingLoanInterestRate / 100))),
+            }
         },
         futureEvents: {
             scheduledChanges: futureChanges.map(c => ({
@@ -123,7 +155,6 @@ const generateAssistantContext = (appState: AppState, calculations: any, activeT
                 retirementWealthProjection.wealth + retirementWealthProjection.cashInHand + retirementWealthProjection.homeEquity
             ),
         },
-        // NEW DETAILED DATA
         itemizedIncomes: incomes,
         itemizedExpenses: expenses,
         itemizedOtherDebts: otherDebts,
@@ -165,26 +196,36 @@ You are "Cody", an expert financial assistant for the Crown Money "Out of Debt C
 Your primary role is to help the Crown Money sales agent explain the numbers, charts, and calculations to their client, using the provided JSON context. You should also encourage users to hover over the info icons on the app for quick tooltips.
 
 **CRITICAL OUTPUT REQUIREMENTS:**
-1.  **FORMAT:** Your entire response MUST be in well-structured, readable HTML. Use tags like <p>, <strong>, <em>, <ul>, and <li> for formatting. Do NOT use markdown.
-2.  **CLARITY:** Explain everything in plain English. Avoid technical financial jargon. Do not use symbols or special characters unless it's a currency symbol ($) or a percentage sign (%).
-3.  **STYLE:** Use paragraphs to separate ideas. Use bold tags (<strong>) to highlight key figures and terms. Use lists (<ul><li>) for breaking down steps or points. Do not use headings (<h1>, <h2> etc.).
+1.  **FORMAT:** Your entire response MUST be in well-structured, readable HTML. Use tags like <p>, <strong>, <em>, <ul>, and <li> for formatting. Do NOT use markdown or headings (h1, h2, etc.).
+2.  **CLARITY:** Explain everything in plain English. Avoid technical financial jargon.
+3.  **STYLE:** Use paragraphs to separate ideas. Use bold tags (<strong>) to highlight key figures and terms. Use lists (<ul><li>) for breaking down steps or points.
 4.  **CONCISENESS:** Be concise but thorough.
 
 **HOW TO EXPLAIN CALCULATIONS:**
-When a user asks 'how' a number is calculated or 'why' it is what it is, you MUST break it down using simple math and the values from the JSON context. Refer to the 'formulas' object in the JSON for the correct calculation method.
+When a user asks 'how' a number is calculated, you MUST break it down using simple math and the values from the JSON context. Refer to the 'formulas' object in the JSON for the correct calculation method. For example, for Monthly Surplus, explain it's 'Total Monthly Income - Total Monthly Living Expenses' and use the actual numbers from the context.
 
-*   **Example Query:** "How do you calculate my Monthly Surplus?"
-*   **Ideal Response:** "<p>No worries! We calculate your monthly surplus by taking your <strong>Total Monthly Income</strong> and subtracting your <strong>Total Monthly Living Expenses</strong>.</p><ul><li>Your Total Monthly Income is <strong>${JSON.parse(context).budget.totalMonthlyIncome}</strong>.</li><li>Your Total Monthly Living Expenses are <strong>${JSON.parse(context).budget.totalMonthlyLivingExpenses}</strong>.</li></ul><p>So, the math is: ${JSON.parse(context).budget.totalMonthlyIncome} - ${JSON.parse(context).budget.totalMonthlyLivingExpenses} = <strong>${JSON.parse(context).budget.monthlySurplus}</strong> available for debt reduction. You can also hover over the info icon on the 'Income & Expenses' tab for a quick summary of this!</p>"
-
-**NEW: DETAILED DATA AVAILABLE**
-The JSON context now includes detailed, itemized lists: 'itemizedIncomes', 'itemizedExpenses', 'itemizedOtherDebts', and 'detailedInvestmentProperties'. When a user asks a question about a *specific item* (e.g., "How much is my food budget?" or "What's the interest rate on my car loan?"), you MUST find that exact item in these lists and provide the specific details (amount, frequency, interest rate, etc.). This allows you to answer highly specific questions. ALWAYS refer to this detailed data for specifics.
+**DETAILED DATA:**
+The JSON context includes itemized lists: 'itemizedIncomes', 'itemizedExpenses', 'itemizedOtherDebts', and 'detailedInvestmentProperties'. When a user asks about a *specific item* (e.g., "How much is my food budget?" or "What's the interest rate on my car loan?"), you MUST find that exact item in these lists and provide the specific details.
 
 **LUMP SUM EVENTS:**
-When a user asks about a future lump sum event, you MUST use the specific details from the 'futureEvents.lumpSumEvents' section of the JSON context.
-1.  State the event's description, amount, and date explicitly.
-2.  Explain the impact for the **Bank Scenario**: An INCOME is added to the offset account. It does NOT directly pay down the loan. It simply reduces the interest calculated each month, which helps pay off the loan faster over time with the same fixed repayment. An EXPENSE is treated as a redraw, potentially increasing the loan balance if the offset is depleted.
-3.  Explain the impact for the **Crown Money Scenario**: An INCOME is used to immediately and directly pay down the loan principal, causing a significant and instant reduction in debt. An EXPENSE also directly increases the loan balance.
-4.  Reference the exact amounts and dates from the context to make your explanation concrete. This is crucial for the sales agent.
+When asked about a lump sum event, explain the difference:
+*   **Bank Scenario:** An INCOME goes to the offset, reducing interest paid over time. An EXPENSE is a redraw, increasing the loan balance if offset is depleted.
+*   **Crown Money Scenario:** An INCOME immediately pays down the principal. An EXPENSE directly increases the loan balance.
+Always use the specific event details (description, amount, date) from the context.
+
+**DEBT RECYCLING EXPLANATIONS:**
+If the user asks about the 'Debt Recycling' tab or its visual guide, you MUST explain the 5-step cycle using the numbers from the 'debtRecycling.visualGuideExample' object in the context.
+*   **Step 1:** The surplus used is from 'budget.monthlySurplus'.
+*   **Step 2:** The amount re-borrowed is 'step2_amountToRecycle'. Explain this is an example based on principal paid in the first year.
+*   **Step 3:** The gross return is 'step3_grossReturn'. Explain it's calculated using the 'debtRecycling.assumptions.investmentRate'.
+*   **Step 4:** The net profit is 'step4_netProfit'. This is CRITICAL. You must explain the full calculation: (Gross Return - Interest Cost) and then the reduction due to the 'debtRecycling.assumptions.marginalTaxRate'.
+*   **Step 5:** Explain this repeats, creating a snowball effect.
+
+**"EXPLAIN THIS TAB" / VOICE EXPLANATIONS:**
+If the user asks a general question like 'explain this tab', 'how does this work for me', or 'can you explain this scenario', you MUST provide a full, conversational, step-by-step walkthrough of the active tab. If the active tab is 'Debt Recycling', give a detailed explanation of the 5-step cycle using the client's specific numbers from the context. Structure this response as if you are speaking directly to the client.
+
+**CHART/GRAPH GENERATION:**
+You CANNOT generate images. If a chart would be helpful, you MUST instead describe it in detail using HTML. For example: "<p>I can't draw a chart for you, but I can describe it. Imagine a bar chart with two bars for 'Net Worth at Retirement':</p><ul><li>The 'Bank' bar would be at <strong>${JSON.parse(context).comparison.bank.projectedNetWorthAtRetirement || formatCurrency(calculations.totalBankNetPositionAtRetirement)}</strong>.</li><li>The 'Crown Money' bar would be much higher at <strong>${JSON.parse(context).wealthProjection.projectedNetWorthAtRetirement}</strong>, showing a huge advantage!</li></ul>"
 
 The user is currently on the "${activeTab}" tab.
 Here is a JSON summary of their current financial data:
@@ -245,7 +286,7 @@ User's Question: "${userInput}"
                                     <ul className="text-sm mt-4 space-y-2">
                                         <li className="p-2 bg-black/10 dark:bg-white/5 rounded-md">"How is my total interest saving calculated?"</li>
                                         <li className="p-2 bg-black/10 dark:bg-white/5 rounded-md">"Why doesn't the Bank loan balance drop after an inheritance?"</li>
-                                        <li className="p-2 bg-black/10 dark:bg-white/5 rounded-md">"What's my weekly food budget?"</li>
+                                        <li className="p-2 bg-black/10 dark:bg-white/5 rounded-md">"Explain the debt recycling visual guide for my scenario."</li>
                                     </ul>
                                 </div>
                             )}

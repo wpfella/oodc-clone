@@ -13,15 +13,132 @@ const formatDateForDisplay = (isoDate: string): string => {
     return `${day}/${month}/${year}`;
 };
 
+// --- New Component for FutureChange Impact Analysis ---
+const FutureChangeImpactDisplay: React.FC<{
+    appState: AppState;
+    futureChange: FutureChange;
+    calculations: any;
+}> = React.memo(({ appState, futureChange, calculations }) => {
+    const [showExplanation, setShowExplanation] = useState(false);
+    
+    const formatCurrency = (value: number) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
+    const formatYears = (value: number) => {
+        if (!isFinite(value) || isNaN(value)) return 'N/A';
+        const years = Math.floor(value);
+        const months = Math.round((value - years) * 12);
+        if (years > 0) return `${years}y ${months}m`;
+        return `${months}m`;
+    };
+
+    const impact = useMemo(() => {
+        if (!futureChange.startDate || futureChange.changeAmount === 0 || !futureChange.description) {
+            return { bankText: '', crownText: '', isCalculable: false };
+        }
+
+        const { loan, futureChanges, futureLumpSums, crownMoneyInterestRate, otherDebts } = appState;
+        const { surplus } = calculations;
+
+        // The "impacted" calculation is the main one from the app, which includes everything.
+        const crownImpactedCalc = calculations.crownMoneyLoanCalculation;
+
+        // To get the "baseline", we manually calculate the scenario WITHOUT this specific future change.
+        const baselineFutureChanges = futureChanges.filter(c => c.id !== futureChange.id);
+
+        const consolidatedAmount = otherDebts.reduce((sum, d) => sum + d.amount, 0);
+        const crownLoanForCalc = {
+            amount: (loan.amount + consolidatedAmount) - (loan.offsetBalance || 0),
+            interestRate: crownMoneyInterestRate,
+            repayment: surplus,
+            frequency: 'monthly' as const,
+            offsetBalance: 0,
+        };
+
+        const crownBaselineCalc = calculateAmortization(crownLoanForCalc, {
+            futureChanges: baselineFutureChanges,
+            futureLumpSums: futureLumpSums,
+            strategy: 'crown'
+        });
+
+        if (crownBaselineCalc.termInYears === Infinity || crownImpactedCalc.termInYears === Infinity) {
+            return { bankText: 'Impact cannot be calculated (loan may not be payable).', crownText: '', isCalculable: false };
+        }
+
+        const createImpactText = (baseline: LoanSummary, impacted: LoanSummary, scenario: string) => {
+            const termDiff = baseline.termInYears - impacted.termInYears;
+            const interestDiff = baseline.totalInterest - impacted.totalInterest;
+
+            if (Math.abs(termDiff) < 1/24 && Math.abs(interestDiff) < 100) {
+                return `No significant impact for ${scenario}.`;
+            }
+
+            const termText = termDiff > 0 ? `saves ${formatYears(termDiff)}` : `adds ${formatYears(Math.abs(termDiff))}`;
+            const interestText = interestDiff > 0 ? `saves ${formatCurrency(interestDiff)}` : `costs ${formatCurrency(Math.abs(interestDiff))}`;
+
+            return `${scenario}: ${termText} & ${interestText}.`;
+        };
+
+        const bankText = "Bank: No significant impact."; // Hardcoded as bank scenario is unaffected by surplus changes.
+        const crownText = createImpactText(crownBaselineCalc, crownImpactedCalc, "Crown");
+        
+        return { bankText, crownText, isCalculable: true };
+
+    }, [appState, futureChange, calculations]);
+    
+    if (!impact.isCalculable) return null;
+
+    // Determine if the change is positive (more surplus) or negative (less surplus)
+    // Increase Income -> Positive
+    // Decrease Expense -> Positive
+    // Decrease Income -> Negative
+    // Increase Expense -> Negative
+    const isIncreaseAction = futureChange.changeAmount >= 0;
+    const isPositiveChange = (futureChange.type === 'income' && isIncreaseAction) || (futureChange.type === 'expense' && !isIncreaseAction);
+
+    const color = isPositiveChange ? 'var(--color-positive-text)' : 'var(--color-negative-text)';
+    const bgColor = isPositiveChange ? 'var(--color-positive-bg)' : 'var(--color-negative-bg)';
+
+    return (
+        <div className="mt-2 p-3 text-left rounded-lg text-sm" style={{ backgroundColor: bgColor }}>
+            <p className="font-bold text-center mb-2" style={{ color }}>Impact Analysis</p>
+            <ul className="space-y-1 text-xs">
+                <li style={{ color }}>{impact.bankText}</li>
+                <li style={{ color }}>{impact.crownText}</li>
+            </ul>
+            <button 
+                onClick={() => setShowExplanation(!showExplanation)}
+                className="text-xs text-center w-full mt-2 font-semibold underline decoration-dotted"
+                style={{ color }}
+            >
+                {showExplanation ? 'Hide Explanation' : 'Why are the impacts different?'}
+            </button>
+            {showExplanation && (
+                <div className="mt-2 text-xs border-t pt-2 space-y-2" style={{ borderColor: `${color}80`, color }}>
+                    <p className="font-bold">Why the Bank Scenario is unaffected:</p>
+                    <p className="mt-1">
+                        The Bank scenario assumes you continue to make only your standard, fixed repayments. Any extra income or expenses are handled separately and do not automatically affect the loan.
+                    </p>
+                    <p className="font-bold mt-2">Why the Crown Money Scenario changes:</p>
+                    <p className="mt-1">
+                        The Crown strategy uses your <strong>entire</strong> budget surplus to aggressively pay down debt. Any change to your income or expenses directly alters your monthly surplus, which in turn changes the repayment amount. This has a powerful and direct effect on how quickly you pay off the loan and how much interest you save.
+                    </p>
+                </div>
+            )}
+        </div>
+    );
+});
+
+
 // --- Extracted Component for Future Changes ---
 interface FutureChangesSectionProps {
     futureChanges: FutureChange[];
     incomes: IncomeItem[];
     expenses: ExpenseItem[];
     setAppState: React.Dispatch<React.SetStateAction<AppState>>;
+    appState: AppState;
+    calculations: any;
 }
 
-const FutureChangesSection: React.FC<FutureChangesSectionProps> = React.memo(({ futureChanges, incomes, expenses, setAppState }) => {
+const FutureChangesSection: React.FC<FutureChangesSectionProps> = React.memo(({ futureChanges, incomes, expenses, setAppState, appState, calculations }) => {
     const [customEvent, setCustomEvent] = useState<Record<number, boolean>>({});
     const [focusedDateField, setFocusedDateField] = useState<string | null>(null);
 
@@ -239,6 +356,7 @@ const FutureChangesSection: React.FC<FutureChangesSectionProps> = React.memo(({ 
                                 </label>
                             </div>
                         </div>
+                        <FutureChangeImpactDisplay appState={appState} futureChange={change} calculations={calculations} />
                     </div>
                 );
             })}
@@ -281,27 +399,32 @@ const LumpSumImpactDisplay: React.FC<{
             return { bankText: '', crownText: '', isCalculable: false };
         }
 
-        const { loan, futureChanges, crownMoneyInterestRate } = appState;
-        const { totalMonthlyIncome, totalMonthlyExpenses, getMonthlyAmount } = calculations;
+        const { loan, futureChanges, futureLumpSums, crownMoneyInterestRate, otherDebts } = appState;
+        const { surplus } = calculations;
 
-        // --- Common Calculation Params ---
-        const surplusAfterLivingAndInvestmentExpenses = totalMonthlyIncome - totalMonthlyExpenses;
-        const monthlyPrimaryLoanRepayment = getMonthlyAmount(loan.repayment, loan.frequency);
-        const extraMonthlyPaymentForCrown = Math.max(0, surplusAfterLivingAndInvestmentExpenses - monthlyPrimaryLoanRepayment);
-        
-        const crownLoanDetails: LoanDetails = { ...loan, interestRate: crownMoneyInterestRate };
-        const bankLoanDetails = { ...loan };
-        
-        // --- Calculations without ANY lump sums (Baselines) ---
-        const crownBaselineCalc = calculateAmortization(crownLoanDetails, { extraMonthlyPayment: extraMonthlyPaymentForCrown, futureChanges, strategy: 'crown' });
-        const bankBaselineCalc = calculateAmortization(bankLoanDetails, { strategy: 'bank' });
+        // The "impacted" calculation is the main one from the app, which includes everything.
+        const crownImpactedCalc = calculations.crownMoneyLoanCalculation;
 
-        // --- Calculations with only THIS lump sum ---
-        const crownImpactedCalc = calculateAmortization(crownLoanDetails, { extraMonthlyPayment: extraMonthlyPaymentForCrown, futureChanges, futureLumpSums: [lumpSum], strategy: 'crown' });
-        const bankImpactedCalc = calculateAmortization(bankLoanDetails, { futureLumpSums: [lumpSum], strategy: 'bank' });
+        // To get the "baseline", we manually calculate the scenario WITHOUT this specific lump sum.
+        const baselineLumpSums = futureLumpSums.filter(l => l.id !== lumpSum.id);
+
+        const consolidatedAmount = otherDebts.reduce((sum, d) => sum + d.amount, 0);
+        const crownLoanForCalc = {
+            amount: (loan.amount + consolidatedAmount) - (loan.offsetBalance || 0),
+            interestRate: crownMoneyInterestRate,
+            repayment: surplus,
+            frequency: 'monthly' as const,
+            offsetBalance: 0,
+        };
         
-        if ([crownBaselineCalc, bankBaselineCalc, crownImpactedCalc, bankImpactedCalc].some(c => c.termInYears === Infinity)) {
-            return { bankText: '', crownText: '', isCalculable: false };
+        const crownBaselineCalc = calculateAmortization(crownLoanForCalc, {
+            futureChanges: futureChanges,
+            futureLumpSums: baselineLumpSums,
+            strategy: 'crown'
+        });
+        
+        if (crownBaselineCalc.termInYears === Infinity || crownImpactedCalc.termInYears === Infinity) {
+            return { bankText: 'Impact cannot be calculated (loan may not be payable).', crownText: '', isCalculable: false };
         }
 
         // --- Helper to create text ---
@@ -318,8 +441,8 @@ const LumpSumImpactDisplay: React.FC<{
 
             return `${scenario}: ${termText} & ${interestText}.`;
         };
-
-        const bankText = createImpactText(bankBaselineCalc, bankImpactedCalc, "Bank");
+        
+        const bankText = "Bank: No significant impact."; // Hardcoded as per business logic
         const crownText = createImpactText(crownBaselineCalc, crownImpactedCalc, "Crown");
         
         return { bankText, crownText, isCalculable: true };
@@ -347,16 +470,14 @@ const LumpSumImpactDisplay: React.FC<{
             </button>
             {showExplanation && (
                 <div className="mt-2 text-xs border-t pt-2 space-y-2" style={{ borderColor: `${color}80`, color }}>
-                    <p className="font-bold">How the impact is calculated:</p>
-                    <ul className="list-disc pl-4 mt-1 space-y-2">
-                        <li>
-                            <strong>Bank Scenario:</strong> We assume your lump sum income goes into your offset account. This reduces the interest calculated each month, so more of your <strong>fixed repayment</strong> goes towards the principal. This shortens the loan term, but does not immediately reduce the loan balance itself. A lump sum expense is treated as a redraw, increasing your loan balance if the offset is depleted.
-                        </li>
-                        <li>
-                            <strong>Crown Money Scenario:</strong> The Crown strategy is to use the entire lump sum income to <strong>immediately pay down the loan principal</strong>. This creates a large, instant reduction in your debt, leading to massive interest savings. A lump sum expense also directly increases the loan balance.
-                        </li>
-                    </ul>
-                    <p className="mt-2">This difference in how lump sum income is handled is a key reason for the different outcomes in term and interest saved.</p>
+                    <p className="font-bold">Why the Bank Scenario is unaffected:</p>
+                    <p className="mt-1">
+                        The Bank scenario assumes any lump sum events are handled with funds outside of your home loan. This means these one-off events do not impact the loan's repayment timeline or the total interest paid to the bank.
+                    </p>
+                    <p className="font-bold mt-2">Why the Crown Money Scenario changes:</p>
+                    <p className="mt-1">
+                        The Crown strategy uses your <strong>entire</strong> financial picture. An income event is used to pay down the loan principal <strong>immediately</strong>, making a big, instant impact on your interest costs. An expense directly increases the loan balance. This direct-to-principal approach is why you see a significant change in the Crown scenario.
+                    </p>
                 </div>
             )}
         </div>
@@ -493,7 +614,7 @@ interface Props {
 
 const Tab3_IncomeExpenses: React.FC<Props> = ({ appState, setAppState, calculations }) => {
   const { incomes, expenses, futureChanges, futureLumpSums, loan, otherDebts } = appState;
-  const { totalMonthlyIncome, totalMonthlyExpenses, investmentPropertiesNetCashflow, getMonthlyAmount, totalMonthlyLivingExpenses } = calculations;
+  const { totalMonthlyIncome, totalMonthlyExpenses, investmentPropertiesNetCashflow, getMonthlyAmount, surplus } = calculations;
 
   const handleListChange = <T,>(list: T[], setList: (list: T[]) => void, index: number, field: keyof T, value: any) => {
     const newList = [...list];
@@ -520,7 +641,7 @@ const Tab3_IncomeExpenses: React.FC<Props> = ({ appState, setAppState, calculati
   const formatCurrency = (value: number, digits = 0) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value);
 
   const monthlyLoanRepayment = getMonthlyAmount(loan.repayment, loan.frequency);
-  const surplusForDebtReduction = totalMonthlyIncome - totalMonthlyLivingExpenses;
+  const surplusForDebtReduction = surplus;
   const netMonthlyCashflow = surplusForDebtReduction - monthlyLoanRepayment;
 
   const inputClasses = "bg-[var(--input-bg-color)] p-2 rounded border border-[var(--input-border-color)] focus:outline-none focus:ring-2 focus:ring-[var(--input-border-focus-color)]";
@@ -677,10 +798,6 @@ const Tab3_IncomeExpenses: React.FC<Props> = ({ appState, setAppState, calculati
                     </div>
                 )}
                 <div>
-                    <div className="flex justify-between items-center p-2 rounded-lg" style={{ backgroundColor: 'var(--color-negative-bg)' }}>
-                        <span className="font-medium" style={{ color: 'var(--color-negative-text)' }}>Total Monthly Expenses</span>
-                        <span className="font-semibold" style={{ color: 'var(--color-negative-text)' }}>{formatCurrency(totalMonthlyExpenses)}</span>
-                    </div>
                     <div className="text-xs text-[var(--text-color-muted)] mt-1 pr-2 space-y-2 border-l-2 border-[var(--border-color)] pl-2 ml-auto w-fit text-right">
                         {expenseCategories.map(category => {
                             const categoryExpenses = expenses.filter(exp => exp.category === category);
@@ -711,20 +828,24 @@ const Tab3_IncomeExpenses: React.FC<Props> = ({ appState, setAppState, calculati
                             </div>
                         }
                     </div>
+                    <div className="flex justify-between items-center p-2 rounded-lg mt-2" style={{ backgroundColor: 'var(--color-negative-bg)' }}>
+                        <span className="font-medium" style={{ color: 'var(--color-negative-text)' }}>Total Monthly Expenses</span>
+                        <span className="font-semibold" style={{ color: 'var(--color-negative-text)' }}>{formatCurrency(totalMonthlyExpenses)}</span>
+                    </div>
                 </div>
                 
                 <div>
                     <div className="flex justify-between items-center p-3 rounded-lg border" style={{ backgroundColor: 'var(--color-surplus-bg)', borderColor: 'var(--color-surplus-text)' }}>
                         <div className="flex items-center gap-2">
                             <span className="font-bold" style={{ color: 'var(--color-surplus-text)' }}>Surplus for Debt Reduction</span>
-                            <Tooltip text="CALCULATION: Total Monthly Income - Total Monthly Living Expenses. This is the key figure for the Crown Money strategy. This entire amount is used to accelerate your debt reduction.">
+                            <Tooltip text="CALCULATION: Total Monthly Income - Total Monthly Expenses (including investment shortfalls). This is the key figure for the Crown Money strategy. This entire amount is used to accelerate your debt reduction.">
                                 <InfoIcon className="h-4 w-4 text-blue-300 print:hidden"/>
                             </Tooltip>
                         </div>
                         <span className="font-bold text-lg" style={{ color: 'var(--color-surplus-text)' }}>{formatCurrency(surplusForDebtReduction)}</span>
                     </div>
                     <div className="text-right text-xs text-[var(--text-color-muted)] mt-1 pr-2 italic">
-                        ( {formatCurrency(totalMonthlyIncome)} - {formatCurrency(totalMonthlyLivingExpenses)} )
+                        ( {formatCurrency(totalMonthlyIncome)} - {formatCurrency(totalMonthlyExpenses)} )
                     </div>
                 </div>
 
@@ -756,6 +877,8 @@ const Tab3_IncomeExpenses: React.FC<Props> = ({ appState, setAppState, calculati
               incomes={incomes}
               expenses={expenses}
               setAppState={setAppState}
+              appState={appState}
+              calculations={calculations}
             />
             <button onClick={handleAddFutureChange} className="mt-4 text-sm text-[var(--title-color)] hover:opacity-80 transition-opacity font-semibold print:hidden">+ Add Future Change</button>
         </Card>
