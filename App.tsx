@@ -8,17 +8,17 @@ import Tab4_OODC from './components/Tab4_OODC';
 import Tab_InvestmentOODC from './components/Tab_InvestmentOODC';
 import Tab_DebtRecycling from './components/Tab_DebtRecycling';
 import Tab_In2Wealth from './components/Tab_In2Wealth';
-import Tab_Reports, { Tab_Reports_Printable } from './components/Tab_Help';
+import Tab_Reports from './components/Tab_Help';
 import Tab5_Summary from './components/Tab5_Summary';
-import { CrownLogo, SunIcon, MoonIcon, PrintIcon, DownloadIcon, SpeakerOnIcon, SpeakerOffIcon, CalculatorIcon, CodeBracketIcon, TrashIcon, CameraIcon, UndoIcon, SaveIcon, FolderOpenIcon, UploadIcon, ClipboardIcon } from './components/common/IconComponents';
+import { CrownLogo, SunIcon, MoonIcon, DownloadIcon, CalculatorIcon, TrashIcon, CameraIcon, UndoIcon, SaveIcon, FolderOpenIcon, UploadIcon, ClipboardIcon } from './components/common/IconComponents';
 import { useMortgageCalculations } from './hooks/useMortgageCalculations';
 import Toast from './components/common/Toast';
 import Modal from './components/common/Modal';
 import AdvancedCalculator from './components/common/AdvancedCalculator';
-import { useSpeechSynthesizer } from './hooks/useSpeechSynthesizer';
 import Assistant from './components/Assistant';
 import LoginScreen from './components/LoginScreen';
 import Notepad from './components/Notepad';
+import { useDebounce } from './hooks/useDebounce';
 
 const darkPalette = {
     '--bg-color': '#250B40',
@@ -196,19 +196,6 @@ export const emptyAppState: AppState = {
   notepadContent: '',
 };
 
-const tabExplanations: Record<Tab, string> = {
-    [Tab.CurrentLoan]: "G'day! Welcome to the Current Loan tab. This is where we start building your financial picture. Pop in your primary home loan details, like the amount, interest rate, and your repayments. Also, add the details for each borrower. The summary on the right will show you the bank's current plan for your loan. Cheers!",
-    [Tab.InterestBreakdown]: "Right then, let's have a squiz at the Interest Breakdown. This tab shows you where your money is really going with a standard bank loan. Notice how much of your repayment is just feeding the bank's interest in the early years. It's a bit of a shocker, eh? This is the exact problem Crown Money is designed to fix.",
-    [Tab.InvestmentProperties]: "Got a few investment properties? No worries. Add them all in here. We'll need the property value, loan details, and any rent or expenses. The calculator will work out the net cashflow from your portfolio and automatically add it to your overall budget. Too easy!",
-    [Tab.IncomeExpenses]: "This is your budget, mate. Chuck in all your income and day-to-day expenses. The more accurate you are, the better the result. The 'Monthly Surplus' at the end is the magic number – it's the firepower we'll use to smash your debt with the Crown Money strategy.",
-    [Tab.OODC]: "OODC stands for Out Of Debt Component, and this is where the magic happens for your home loan. We use your budget surplus to show you the Crown Money plan versus your bank's. Check out the massive savings in interest and how many years sooner you'll be debt-free. It's a bloody game-changer!",
-    [Tab.InvestmentOODC]: "If you've got investment properties, this tab shows you how we'll tackle that debt after your home is paid off. We typically use the 'snowball' method, knocking over the smallest loans first to build momentum. You'll see how the entire portfolio gets paid off years ahead of the bank's schedule.",
-    [Tab.DebtRecycling]: "Debt Recycling is a powerful strategy to build wealth while paying off your home loan. As you pay down your home loan principal, you can take out a new, tax-deductible investment loan for the same amount. This money is then invested. This tab shows how the net returns from your new investment can be used to accelerate your home loan payoff even further, getting you to the 'In 2 Wealth' stage much faster.",
-    [Tab.In2Wealth]: "Right, you're debt-free! What's next? This is the 'In 2 Wealth' tab. Once your loan is gone, that massive repayment you were making is now yours to invest. Play around with your retirement age and investment strategy to see how you can build some serious long-term wealth for the future. Good on ya!",
-    [Tab.Reports]: "This is the Reports tab. Here you can generate a powerful comparison showing your performance over the last few months with your bank, versus what your next few months will look like with the Crown Money strategy. It's a great way to see the immediate impact of making the switch. You can also print, email, or share these reports directly from here.",
-    [Tab.Summary]: "The Summary tab brings everything together into a neat, one-page report. It's got all the key numbers, comparisons, and outcomes. This is the perfect page to print out or save as a PDF to have a yarn with your family about your new financial future.",
-};
-
 const zapierMessages = {
     loading: 'Uploading record...',
     success: 'Record uploaded successfully!',
@@ -220,7 +207,6 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>(Tab.CurrentLoan);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [zapierStatus, setZapierStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [isDriveModalOpen, setIsDriveModalOpen] = useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [isZapierPasswordModalOpen, setIsZapierPasswordModalOpen] = useState(false);
   const [zapierPasswordInput, setZapierPasswordInput] = useState('');
@@ -229,7 +215,7 @@ const App: React.FC = () => {
   const [snapshot, setSnapshot] = useState<AppState | null>(null);
   const [isRevertModalOpen, setIsRevertModalOpen] = useState(false);
   const [infoToast, setInfoToast] = useState('');
-  const { isSpeaking, speak, cancel } = useSpeechSynthesizer();
+  const [warningToast, setWarningToast] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
@@ -246,6 +232,13 @@ const App: React.FC = () => {
         return () => clearTimeout(timer);
     }
   }, [infoToast]);
+
+  useEffect(() => {
+    if (warningToast) {
+        const timer = setTimeout(() => setWarningToast(''), 8000); // Longer timeout for warnings
+        return () => clearTimeout(timer);
+    }
+  }, [warningToast]);
 
   useEffect(() => {
     const palette = theme === 'dark' ? darkPalette : lightPalette;
@@ -291,7 +284,11 @@ const App: React.FC = () => {
         const mergedState = { ...initialAppState, ...parsedState };
         mergedState.loan = { ...initialAppState.loan, ...(parsedState.loan || {}) };
         mergedState.investmentProperties = mergedState.investmentProperties || [];
+        mergedState.otherDebts = mergedState.otherDebts || [];
+        mergedState.futureChanges = mergedState.futureChanges || [];
         mergedState.futureLumpSums = mergedState.futureLumpSums || [];
+        mergedState.incomes = mergedState.incomes || [];
+        mergedState.expenses = mergedState.expenses || [];
         
         if (typeof parsedState.allPartiesInAttendance === 'boolean') {
              mergedState.allPartiesInAttendance = parsedState.allPartiesInAttendance ? 'Yes- Couple' : 'Only 1 of 2 Showed';
@@ -306,20 +303,12 @@ const App: React.FC = () => {
   });
   
   useEffect(() => {
-    const timer = setTimeout(() => {
-      try {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(appState));
-      } catch (error) {
-        console.error("Failed to save state to localStorage", error);
-      }
-    }, 1000);
-
-    return () => clearTimeout(timer);
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(appState));
+    } catch (error) {
+      console.error("Failed to save state to localStorage", error);
+    }
   }, [appState]);
-  
-  useEffect(() => {
-    cancel();
-  }, [activeTab, cancel]);
   
   useEffect(() => {
     try {
@@ -343,7 +332,8 @@ const App: React.FC = () => {
     }
   };
 
-  const calculations = useMortgageCalculations(appState);
+  const debouncedAppState = useDebounce(appState, 500);
+  const calculations = useMortgageCalculations(debouncedAppState);
 
   const executeZapierSync = async () => {
     if (!appState.clientEmail || appState.clientEmail.trim() === '') {
@@ -357,6 +347,7 @@ const App: React.FC = () => {
       const getSerializableCalculations = (calcs: any) => {
         const {
           getMonthlyAmount,
+          getAnnualAmount,
           calculatePIPayment,
           calculateIOPayment,
           wealthCalcs, // This function is spread into the top level of the calculations object
@@ -436,12 +427,12 @@ const App: React.FC = () => {
   };
 
   const tabs: { id: Tab; label: string; component: React.ReactNode }[] = [
-    { id: Tab.CurrentLoan, label: 'Current Loan', component: <Tab1_CurrentLoan appState={appState} setAppState={setAppState} calculations={calculations} /> },
-    { id: Tab.InterestBreakdown, label: 'Interest Breakdown', component: <Tab2_InterestBreakdown appState={appState} setAppState={setAppState} calculations={calculations} /> },
-    { id: Tab.InvestmentProperties, label: 'Investments', component: <Tab_InvestmentProperties appState={appState} setAppState={setAppState} calculations={calculations} /> },
+    { id: Tab.CurrentLoan, label: 'Current Loan', component: <Tab1_CurrentLoan appState={appState} setAppState={setAppState} calculations={calculations} setWarningToast={setWarningToast} /> },
+    { id: Tab.InterestBreakdown, label: 'Int Breakdown', component: <Tab2_InterestBreakdown appState={appState} setAppState={setAppState} calculations={calculations} /> },
+    { id: Tab.InvestmentProperties, label: 'Investments', component: <Tab_InvestmentProperties appState={appState} setAppState={setAppState} calculations={calculations} setWarningToast={setWarningToast} /> },
     { id: Tab.IncomeExpenses, label: 'Income & Expenses', component: <Tab3_IncomeExpenses appState={appState} setAppState={setAppState} calculations={calculations} /> },
     { id: Tab.OODC, label: 'OODC', component: <Tab4_OODC appState={appState} setAppState={setAppState} calculations={calculations} /> },
-    { id: Tab.InvestmentOODC, label: 'Investment OODC', component: <Tab_InvestmentOODC appState={appState} setAppState={setAppState} calculations={calculations} /> },
+    { id: Tab.InvestmentOODC, label: 'Inv OODC', component: <Tab_InvestmentOODC appState={appState} setAppState={setAppState} calculations={calculations} /> },
     { id: Tab.DebtRecycling, label: 'Debt Recycling', component: <Tab_DebtRecycling appState={appState} setAppState={setAppState} calculations={calculations} /> },
     { id: Tab.In2Wealth, label: 'In 2 Wealth', component: <Tab_In2Wealth appState={appState} setAppState={setAppState} calculations={calculations} /> },
     { id: Tab.Reports, label: 'Reports', component: <Tab_Reports appState={appState} setAppState={setAppState} calculations={calculations} /> },
@@ -629,223 +620,6 @@ const App: React.FC = () => {
     return html;
   }
   
-  const handlePrint = () => {
-    setIsDriveModalOpen(false);
-    window.print();
-  };
-
-  const generateFlatData = (): [string, any][] => {
-    const data: [string, any][] = [];
-    const { 
-        bankLoanCalculation, crownMoneyLoanCalculation, 
-        investmentLoanCalculations, totalMonthlyIncome, totalMonthlyExpenses, getMonthlyAmount,
-        investmentPropertiesNetCashflow
-    } = calculations;
-
-    const isBankLoanValid = bankLoanCalculation.termInYears !== Infinity;
-    const isCrownLoanValid = crownMoneyLoanCalculation.termInYears !== Infinity;
-    
-    const addProperty = (key: string, value: any) => {
-        if (value !== null && value !== undefined && !(typeof value === 'number' && isNaN(value))) {
-            data.push([key.toLowerCase().replace(/\s/g, '_'), value]);
-        }
-    };
-
-    // --- Core Aggregates & Loan Details ---
-    addProperty('property_value', appState.loan.propertyValue);
-    addProperty('loan_amount', appState.loan.amount);
-    addProperty('offset_balance', appState.loan.offsetBalance || 0);
-    const netLoanAmount = appState.loan.amount - (appState.loan.offsetBalance || 0);
-    addProperty('net_loan_amount', netLoanAmount);
-
-    addProperty('monthly_net_income', totalMonthlyIncome);
-    addProperty('monthly_expenses_without_mortgage', totalMonthlyExpenses);
-    addProperty('net_investment_cashflow', investmentPropertiesNetCashflow);
-    
-    if (isBankLoanValid) {
-        const firstYearBankPrincipal = bankLoanCalculation.amortizationSchedule.slice(0, 12).reduce((acc: number, curr: any) => acc + curr.principalPaid, 0);
-        addProperty('current_annual_debt_reduction', firstYearBankPrincipal);
-    }
-    
-    appState.people.forEach((person, index) => {
-        addProperty(`loan_holder_${index + 1}_name`, person.name);
-        addProperty(`loan_holder_${index + 1}_age`, person.age);
-    });
-
-    addProperty('current_lender_sales', appState.currentLender);
-    addProperty('repayment_frequency', appState.loan.frequency);
-    
-    const monthlyRepayment = getMonthlyAmount(appState.loan.repayment, appState.loan.frequency);
-    addProperty('total_monthly_repayments_current', monthlyRepayment);
-
-    const debtRepayExpense = appState.expenses.find(e => e.name === 'Debt Repay');
-    const monthlyDebtRepay = debtRepayExpense ? getMonthlyAmount(debtRepayExpense.amount, debtRepayExpense.frequency) : 0;
-    addProperty('other_debts', monthlyDebtRepay);
-    
-    if (isBankLoanValid && bankLoanCalculation.totalPaid > 0) {
-        addProperty('of_payments_spent_on_interest', (bankLoanCalculation.totalInterest / bankLoanCalculation.totalPaid) * 100);
-    }
-
-    addProperty('interest_left_to_pay_sales', isBankLoanValid ? bankLoanCalculation.totalInterest : null);
-    addProperty('years_left_on_current_loan', isBankLoanValid ? bankLoanCalculation.termInYears : null);
-    addProperty('years_left_on_hop_loan', isCrownLoanValid ? crownMoneyLoanCalculation.termInYears : null);
-    addProperty('total_interest_payable_on_hop_loan', isCrownLoanValid ? crownMoneyLoanCalculation.totalInterest : null);
-
-    const primaryInterestSaved = isBankLoanValid && isCrownLoanValid ? bankLoanCalculation.totalInterest - crownMoneyLoanCalculation.totalInterest : 0;
-    addProperty('interest_saved_on_mortgage', primaryInterestSaved);
-    
-    if (isCrownLoanValid) {
-        const firstYearCrownPrincipal = crownMoneyLoanCalculation.amortizationSchedule.slice(0, 12).reduce((acc: number, curr: any) => acc + curr.principalPaid, 0);
-        addProperty('expected_annual_debt_reduction_on_hop', firstYearCrownPrincipal);
-    }
-
-    if (isBankLoanValid && isCrownLoanValid) {
-        addProperty('years_saved_on_mortgage', bankLoanCalculation.termInYears - crownMoneyLoanCalculation.termInYears);
-    }
-    
-    addProperty('number_of_kids', appState.numberOfKids);
-    addProperty('all_parties_in_attendance', appState.allPartiesInAttendance);
-
-    const fffExpenses = appState.expenses.filter(e => e.category === 'FFF');
-    const monthlyFFF = fffExpenses.reduce((sum, exp) => sum + getMonthlyAmount(exp.amount, exp.frequency), 0);
-    const weeklyFFF = monthlyFFF * 12 / 52;
-    addProperty('weekly_spend_amount', weeklyFFF);
-
-    addProperty('current_interest_rate', appState.loan.interestRate);
-
-    // --- Detailed Itemized Data ---
-    appState.incomes.forEach((income, index) => {
-        addProperty(`income_${index + 1}_name`, income.name);
-        addProperty(`income_${index + 1}_amount`, income.amount);
-        addProperty(`income_${index + 1}_frequency`, income.frequency);
-        addProperty(`income_${index + 1}_monthly_amount`, getMonthlyAmount(income.amount, income.frequency));
-    });
-
-    appState.expenses.forEach((expense, index) => {
-        addProperty(`expense_${index + 1}_name`, expense.name);
-        addProperty(`expense_${index + 1}_amount`, expense.amount);
-        addProperty(`expense_${index + 1}_frequency`, expense.frequency);
-        addProperty(`expense_${index + 1}_category`, expense.category);
-        addProperty(`expense_${index + 1}_monthly_amount`, getMonthlyAmount(expense.amount, expense.frequency));
-    });
-
-    appState.otherDebts.forEach((debt, index) => {
-        const debtPrefix = `other_debt_${index + 1}`;
-        addProperty(`${debtPrefix}_name`, debt.name);
-        addProperty(`${debtPrefix}_amount`, debt.amount);
-        addProperty(`${debtPrefix}_interest_rate`, debt.interestRate);
-        addProperty(`${debtPrefix}_repayment`, debt.repayment);
-        addProperty(`${debtPrefix}_frequency`, debt.frequency);
-    });
-
-    appState.futureChanges.forEach((change, index) => {
-        addProperty(`future_change_${index + 1}_description`, change.description);
-        addProperty(`future_change_${index + 1}_type`, change.type);
-        addProperty(`future_change_${index + 1}_change_amount`, change.changeAmount);
-        addProperty(`future_change_${index + 1}_frequency`, change.frequency);
-        addProperty(`future_change_${index + 1}_start_date`, change.startDate);
-        addProperty(`future_change_${index + 1}_end_date`, change.endDate);
-        addProperty(`future_change_${index + 1}_is_permanent`, change.isPermanent);
-    });
-
-    appState.futureLumpSums.forEach((lump, index) => {
-        addProperty(`future_lump_sum_${index + 1}_description`, lump.description);
-        addProperty(`future_lump_sum_${index + 1}_type`, lump.type);
-        addProperty(`future_lump_sum_${index + 1}_amount`, lump.amount);
-        addProperty(`future_lump_sum_${index + 1}_date`, lump.date);
-    });
-
-    appState.investmentProperties.forEach((prop, index) => {
-        const propPrefix = `investment_prop_${index + 1}`;
-        addProperty(`${propPrefix}_address`, prop.address);
-        addProperty(`${propPrefix}_value`, prop.propertyValue);
-        addProperty(`${propPrefix}_loan_amount`, prop.loanAmount);
-        addProperty(`${propPrefix}_offset`, prop.offsetBalance);
-        addProperty(`${propPrefix}_interest_rate`, prop.interestRate);
-        addProperty(`${propPrefix}_loan_term`, prop.loanTerm);
-        addProperty(`${propPrefix}_loan_type`, prop.loanType);
-        addProperty(`${propPrefix}_repayment`, prop.repayment);
-        addProperty(`${propPrefix}_repayment_frequency`, prop.repaymentFrequency);
-        addProperty(`${propPrefix}_rental_income`, prop.rentalIncome);
-        addProperty(`${propPrefix}_rental_income_frequency`, prop.rentalIncomeFrequency);
-        
-        prop.expenses.forEach((exp, expIndex) => {
-            const expPrefix = `${propPrefix}_expense_${expIndex + 1}`;
-            addProperty(`${expPrefix}_name`, exp.name);
-            addProperty(`${expPrefix}_amount`, exp.amount);
-            addProperty(`${expPrefix}_frequency`, exp.frequency);
-        });
-    });
-
-    return data;
-  };
-
-
-  const generateSummaryCSV = (): string => {
-    const flatData = generateFlatData();
-
-    const formatKeyToProperName = (key: string): string => {
-      let formattedKey = key.replace(/_/g, ' ');
-      let words = formattedKey.split(' ').filter(Boolean);
-      words = words.map(word => word.charAt(0).toUpperCase() + word.slice(1));
-      let finalName = words.join(' ');
-      finalName = finalName.replace(/Id/g, 'ID');
-      finalName = finalName.replace(/Hop/g, 'HOP');
-      finalName = finalName.replace(/Oodc/g, 'OODC');
-      return finalName;
-    };
-
-    const formatForCSV = (value: any): string => {
-      if (value === null || value === undefined) return '';
-      const str = String(value).replace(/"/g, '""');
-      if (str.search(/("|,|\n)/g) >= 0) {
-        return `"${str}"`;
-      }
-      return str;
-    };
-    
-    const rows = flatData.map(([key, value]) => {
-        const properName = formatKeyToProperName(key);
-        let formattedValue = value;
-        if (typeof value === 'number') {
-            formattedValue = Math.round(value * 100) / 100;
-        }
-        return [properName, key, formattedValue];
-    });
-
-    rows.unshift(['Field Name', 'HubSpot Property', 'Value']);
-    
-    return rows.map(row => row.map(formatForCSV).join(',')).join('\n');
-  };
-
-  const handleSaveCSV = () => {
-    setIsDriveModalOpen(false);
-    const csvContent = generateSummaryCSV();
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    const emailPrefix = appState.clientEmail ? String(appState.clientEmail).split('@')[0].replace(/[^a-z0-9]/gi, '_') : 'summary';
-    const date = new Date().toISOString().split('T')[0];
-    link.setAttribute("download", `crown_money_summary_${emailPrefix}_${date}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-  
-  const handleExplain = () => {
-      if (isSpeaking) {
-          cancel();
-      } else {
-          const explanation = tabExplanations[activeTab];
-          if (explanation) {
-              speak(explanation);
-          }
-      }
-  };
-
   const handleResetApp = () => {
     try {
       localStorage.removeItem(LOCAL_STORAGE_KEY);
@@ -1004,21 +778,33 @@ const App: React.FC = () => {
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
             }
-            .app-header, .app-nav, .app-main > div:not(.printable-report-container) {
+            .app-header, .app-nav, .no-print {
                 display: none !important;
             }
-            .active-tab-content {
+            .app-main {
+                padding: 0 !important;
+                margin: 0 !important;
+                background: transparent !important;
+                border: none !important;
+                box-shadow: none !important;
+            }
+            .app-main > div {
                 display: none !important;
             }
-            .printable-report-container {
+            .app-main > div.printable {
                 display: block !important;
             }
         }
       `}</style>
       
       {infoToast && (
-        <div className="fixed top-8 right-8 z-50 p-4 rounded-lg text-white font-semibold shadow-2xl bg-green-600 transform transition-all duration-300 translate-x-0 opacity-100">
+        <div className="fixed top-8 right-8 z-50 p-4 rounded-lg text-white font-semibold shadow-2xl bg-green-600 transform transition-all duration-300 translate-x-0 opacity-100 no-print">
             {infoToast}
+        </div>
+      )}
+      {warningToast && (
+        <div className="fixed top-24 right-8 z-50 p-4 rounded-lg text-white font-semibold shadow-2xl bg-amber-600 no-print animate-fade-in">
+            {warningToast}
         </div>
       )}
       <Toast status={zapierStatus} messages={zapierMessages} className="top-20" />
@@ -1057,10 +843,6 @@ const App: React.FC = () => {
                     <span className="text-sm font-semibold hidden sm:inline">Revert Changes</span>
                 </button>
               )}
-              <button onClick={() => setIsDriveModalOpen(true)} title="Export Client Report" className={buttonBaseClasses}>
-                  <PrintIcon className="h-5 w-5"/>
-                  <span className="text-sm font-semibold hidden sm:inline">Export Report</span>
-              </button>
                <button onClick={() => setIsCalculatorOpen(true)} title="Advanced Calculator" className={buttonBaseClasses}>
                   <CalculatorIcon className="h-5 w-5"/>
                   <span className="text-sm font-semibold hidden sm:inline">Calculator</span>
@@ -1068,10 +850,6 @@ const App: React.FC = () => {
                <button onClick={() => setIsNotepadOpen(prev => !prev)} title="Open Notepad" className={buttonBaseClasses}>
                    <ClipboardIcon className="h-5 w-5"/>
                    <span className="text-sm font-semibold hidden sm:inline">Notepad</span>
-               </button>
-               <button onClick={handleExplain} title="Explain this Tab" className={buttonBaseClasses}>
-                  {isSpeaking ? <SpeakerOffIcon className="h-5 w-5"/> : <SpeakerOnIcon className="h-5 w-5"/>}
-                  <span className="text-sm font-semibold hidden sm:inline">{isSpeaking ? 'Stop' : 'Explain'}</span>
                </button>
                <button onClick={() => setIsResetModalOpen(true)} title="Start Fresh" className={buttonBaseClasses}>
                     <TrashIcon className="h-5 w-5"/>
@@ -1086,7 +864,7 @@ const App: React.FC = () => {
         <main className="bg-[var(--card-bg-color)] backdrop-blur-sm p-4 sm:p-6 rounded-2xl shadow-2xl border border-[var(--border-color)] print:bg-transparent print:p-0 print:shadow-none print:border-none">
           <nav className="app-nav mb-6 print:hidden">
             <div className="border-b border-[var(--border-color)]">
-              <div className="-mb-px flex flex-wrap space-x-2 sm:space-x-6 justify-center" aria-label="Tabs">
+              <div className="-mb-px flex flex-wrap space-x-2 sm:space-x-4 justify-center" aria-label="Tabs">
                 {tabs.map((tab) => (
                   <button
                     key={tab.id}
@@ -1107,7 +885,7 @@ const App: React.FC = () => {
           
           <div className="app-main mt-4">
              {tabs.map(tab => (
-                <div key={tab.id} className={activeTab === tab.id ? 'active-tab-content' : 'hidden'}>
+                <div key={tab.id} className={`${activeTab === tab.id ? 'active-tab-content' : 'hidden'} ${tab.id === Tab.Reports ? 'printable' : ''}`}>
                     {tab.component}
                 </div>
             ))}
@@ -1164,45 +942,6 @@ const App: React.FC = () => {
         title="Advanced Finance Calculator"
       >
         <AdvancedCalculator />
-      </Modal>
-
-      <Modal
-        isOpen={isDriveModalOpen}
-        onClose={() => setIsDriveModalOpen(false)}
-        title="Export Client Report"
-      >
-        <div className="space-y-4 text-sm text-[var(--text-color-muted)]">
-            <p>You can export the client report in two different formats:</p>
-            <div className="flex items-start gap-4 p-3 bg-black/10 dark:bg-white/5 rounded-lg">
-                <div className="flex-shrink-0 bg-[var(--title-color)] text-[var(--bg-color)] print:text-white rounded-full h-6 w-6 flex items-center justify-center font-bold">1</div>
-                <div>
-                    <h4 className="font-bold text-[var(--text-color)]">Generate & Save PDF</h4>
-                    <p>Creates a visual PDF report. This is best for sharing with clients.</p>
-                </div>
-            </div>
-            <div className="flex items-start gap-4 p-3 bg-black/10 dark:bg-white/5 rounded-lg">
-                <div className="flex-shrink-0 bg-[var(--title-color)] text-[var(--bg-color)] print:text-white rounded-full h-6 w-6 flex items-center justify-center font-bold">2</div>
-                <div>
-                    <h4 className="font-bold text-[var(--text-color)]">Save as CSV</h4>
-                    <p>Exports all data fields individually into a CSV file. Ideal for spreadsheets or importing into other systems like HubSpot.</p>
-                </div>
-            </div>
-        </div>
-        <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <button 
-                onClick={handlePrint} 
-                className="w-full p-2 bg-[var(--button-bg-color)] text-white rounded-md font-semibold hover:bg-[var(--button-bg-hover-color)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--title-color)]"
-            >
-                Generate & Save PDF
-            </button>
-            <button 
-                onClick={handleSaveCSV}
-                className="w-full p-2 bg-[var(--card-bg-color)] hover:bg-[var(--input-bg-color)] rounded-md font-semibold text-center border border-[var(--border-color)] transition-colors flex items-center justify-center gap-2"
-            >
-                <DownloadIcon className="h-5 w-5" />
-                <span>Save as CSV</span>
-            </button>
-        </div>
       </Modal>
 
       <Modal
@@ -1338,11 +1077,6 @@ const App: React.FC = () => {
       />
       
       <Assistant appState={appState} calculations={calculations} activeTab={tabs.find(t => t.id === activeTab)?.label || 'Current Loan'} />
-      
-      {/* This is the container for the printable report */}
-      <div className="printable-report-container hidden print:block">
-        <Tab_Reports_Printable appState={appState} setAppState={setAppState} calculations={calculations} />
-      </div>
     </div>
   );
 };

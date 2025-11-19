@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { AppState, AmortizationDataPoint, LoanDetails } from '../types';
 import Card from './common/Card';
 import SliderInput from './common/SliderInput';
-import { AreaChart, ComposedChart, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, CartesianGrid, Area, Scatter, ReferenceDot, LineChart, Line, Label, PieChart, Pie, Cell, ReferenceArea } from 'recharts';
+import { AreaChart, ComposedChart, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, CartesianGrid, Area, Scatter, ReferenceDot, Line, Label, PieChart, Pie, Cell, ReferenceArea } from 'recharts';
 import Tooltip from './common/Tooltip';
 import { InfoIcon, DownloadIcon } from './common/IconComponents';
 import { calculateAmortization, getMonthlyAmount, calculatePIPayment } from '../hooks/useMortgageCalculations';
@@ -175,7 +175,7 @@ const FutureEventsImpactSummary: React.FC<{ appState: AppState; calculations: an
 
         if (surplus <= 0) return { termInYears: Infinity, totalInterest: Infinity };
 
-        const consolidatedAmount = otherDebts.reduce((sum, d) => sum + d.amount, 0);
+        const consolidatedAmount = (otherDebts || []).reduce((sum, d) => sum + d.amount, 0);
         const crownLoanForCalc = {
             amount: (loan.amount + consolidatedAmount) - (loan.offsetBalance || 0),
             interestRate: crownMoneyInterestRate,
@@ -231,7 +231,8 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
       totalMonthlyIncome,
       totalMonthlyExpenses,
       people,
-      getMonthlyAmount
+      getMonthlyAmount,
+      surplus
     } = calculations;
   
   const youngestPersonAge = Math.min(...people.map((p: any) => p.age));
@@ -250,9 +251,6 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
     
     const { loan, futureChanges, futureLumpSums, crownMoneyInterestRate, otherDebts } = appState;
     
-    // Create a temporary AppState for recalculation
-    const tempState = { ...appState, incomes: [...appState.incomes, { id: 999, name: 'Additional Income', amount: additionalMonthlyIncome, frequency: 'monthly' as 'monthly' }] };
-    
     // We need to re-run the core logic from the hook with the adjusted income
     const adjustedSurplus = (totalMonthlyIncome + additionalMonthlyIncome) - totalMonthlyExpenses;
 
@@ -261,7 +259,7 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
     }
     
     // This is a simplified version of the hook logic for the "what if" scenario
-    const consolidatedAmount = otherDebts.reduce((sum, d) => sum + d.amount, 0);
+    const consolidatedAmount = (otherDebts || []).reduce((sum, d) => sum + d.amount, 0);
     const primaryLoanBalance = (loan.amount + consolidatedAmount) - (loan.offsetBalance || 0);
 
     const minPrimaryPayment = calculatePIPayment(primaryLoanBalance, crownMoneyInterestRate, 30, 'monthly');
@@ -281,6 +279,41 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
   
   const crownMoneyLoanCalculation = adjustedCrownLoanCalculation;
 
+  const loanBalanceChartData = useMemo(() => {
+    const bankSchedule = bankLoanCalculation.amortizationSchedule;
+    const crownSchedule = adjustedCrownLoanCalculation.amortizationSchedule;
+    
+    if (!bankSchedule || !crownSchedule) return [];
+
+    const bankStart = loan.amount - (loan.offsetBalance || 0);
+    const consolidatedDebt = (appState.otherDebts || []).reduce((sum, d) => sum + d.amount, 0);
+    const crownStart = bankStart + consolidatedDebt;
+    
+    const data = [{
+        year: 0,
+        age: youngestPersonAge,
+        'Bank': bankStart,
+        'Crown Money': crownStart
+    }];
+
+    const maxMonths = Math.max(bankSchedule.length, crownSchedule.length);
+    
+    for (let i = 0; i < maxMonths; i++) {
+        const month = i + 1;
+        const bankBal = bankSchedule[i]?.remainingBalance ?? 0;
+        const crownBal = crownSchedule[i]?.totalRemainingBalance ?? 0;
+        
+        data.push({
+            year: month / 12,
+            age: youngestPersonAge + (month / 12),
+            'Bank': bankBal > 0 ? bankBal : 0,
+            'Crown Money': crownBal > 0 ? crownBal : 0
+        });
+    }
+    
+    return data;
+  }, [bankLoanCalculation, adjustedCrownLoanCalculation, loan, appState.otherDebts, youngestPersonAge]);
+
   const first12MonthsData = useMemo(() => {
     const bankSchedule = bankLoanCalculation.amortizationSchedule.slice(0, 12);
     const crownSchedule = crownMoneyLoanCalculation.amortizationSchedule.slice(0, 12);
@@ -290,7 +323,7 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
     const bankStartDebt = loan.amount - (loan.offsetBalance || 0);
     
     // Calculate the correct starting debt for Crown Money (total debt)
-    const consolidatedAmount = appState.otherDebts.reduce((sum, debt) => sum + debt.amount, 0);
+    const consolidatedAmount = (appState.otherDebts || []).reduce((sum, debt) => sum + debt.amount, 0);
     const crownStartDebt = (loan.amount - (loan.offsetBalance || 0)) + consolidatedAmount;
 
     const data: {month: number, 'Bank': number, 'Crown Money': number}[] = [{
@@ -317,8 +350,8 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
   const isBankLoanValid = bankLoanCalculation.termInYears !== Infinity;
   const isCrownLoanValid = crownMoneyLoanCalculation.termInYears !== Infinity;
 
-  const primaryInterestSaved = isBankLoanValid && isCrownLoanValid ? bankLoanCalculation.primaryLoanInterest - crownMoneyLoanCalculation.primaryLoanInterest : 0;
-  const otherDebtsInterestSaved = isBankLoanValid && isCrownLoanValid ? bankLoanCalculation.otherDebtsInterest - crownMoneyLoanCalculation.otherDebtsInterest : 0;
+  const primaryInterestSaved = isBankLoanValid && isCrownLoanValid ? bankLoanCalculation.totalInterest - crownMoneyLoanCalculation.primaryLoanInterest : 0;
+  const otherDebtsInterestSaved = 0; // Bank calculation no longer includes other debts
   const totalInterestSaved = primaryInterestSaved + otherDebtsInterestSaved;
 
   const bankDebtFreeAges = appState.people.reduce((acc, p) => {
@@ -347,8 +380,6 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
     },
   ];
   
-  const loanBalanceChartData = calculations.totalDebtData;
-  
   const SliderLabel = () => (
     <div className='flex items-center justify-center gap-2'>
         <span className='text-sm font-medium text-[var(--text-color)] print:text-black'>Crown Money Interest Rate</span>
@@ -366,28 +397,31 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
   if (!xTicks.includes(maxYear) && maxYear > 0) xTicks.push(maxYear);
 
   const { bankYear1, crownYear1, bankLifetime, crownLifetime } = useMemo(() => {
+    const bankYear1Interest = bankLoanCalculation.amortizationSchedule.slice(0, 12).reduce((sum, item) => sum + item.interestPaid, 0);
+    const bankYear1Principal = bankLoanCalculation.amortizationSchedule.slice(0, 12).reduce((sum, item) => sum + item.principalPaid, 0);
+
     return {
         bankYear1: {
-            homeLoanInterest: bankLoanCalculation.year1PrimaryLoanInterest,
-            otherDebtsInterest: bankLoanCalculation.year1OtherDebtsInterest
+            homeLoanInterest: bankYear1Interest,
+            principal: bankYear1Principal,
         },
         crownYear1: {
-            principal: (surplusForDebtReduction * 12) - (crownMoneyLoanCalculation.year1PrimaryLoanInterest + crownMoneyLoanCalculation.year1OtherDebtsInterest),
+            principal: (surplus * 12) - (crownMoneyLoanCalculation.year1PrimaryLoanInterest + crownMoneyLoanCalculation.year1OtherDebtsInterest),
             homeLoanInterest: crownMoneyLoanCalculation.year1PrimaryLoanInterest,
             otherDebtsInterest: crownMoneyLoanCalculation.year1OtherDebtsInterest
         },
         bankLifetime: {
-            principal: (loan.amount - (loan.offsetBalance || 0)) + appState.otherDebts.reduce((s, d) => s + d.amount, 0),
-            homeLoanInterest: bankLoanCalculation.primaryLoanInterest,
-            otherDebtsInterest: bankLoanCalculation.otherDebtsInterest
+            principal: (loan.amount - (loan.offsetBalance || 0)),
+            homeLoanInterest: bankLoanCalculation.totalInterest,
+            otherDebtsInterest: 0
         },
         crownLifetime: {
-            principal: (loan.amount - (loan.offsetBalance || 0)) + appState.otherDebts.reduce((s, d) => s + d.amount, 0),
+            principal: (loan.amount - (loan.offsetBalance || 0)) + (appState.otherDebts || []).reduce((s, d) => s + d.amount, 0),
             homeLoanInterest: crownMoneyLoanCalculation.primaryLoanInterest,
             otherDebtsInterest: crownMoneyLoanCalculation.otherDebtsInterest
         },
     };
-  }, [bankLoanCalculation, crownMoneyLoanCalculation, loan, appState.otherDebts, surplusForDebtReduction]);
+  }, [bankLoanCalculation, crownMoneyLoanCalculation, loan, appState.otherDebts, surplus]);
 
   const DonutChartCard: React.FC<{
       title: string;
@@ -503,28 +537,6 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
       );
   };
   
-  const otherDebtsChartData = useMemo(() => {
-    if (appState.otherDebts.length === 0) return [];
-    return [
-      {
-        name: 'Payoff Time',
-        Bank: bankLoanCalculation.bankOtherDebtsMaxTerm,
-        'Crown Money': crownMoneyLoanCalculation.otherDebtPayoffDetails.reduce((max, d) => Math.max(max, d.payoffMonth / 12), 0),
-      },
-    ];
-  }, [appState.otherDebts, bankLoanCalculation, crownMoneyLoanCalculation]);
-
-  const otherDebtsInterestChartData = useMemo(() => {
-    if (appState.otherDebts.length === 0) return [];
-    return [
-      {
-        name: 'Interest Paid',
-        Bank: bankLoanCalculation.otherDebtsInterest,
-        'Crown Money': crownMoneyLoanCalculation.otherDebtsInterest,
-      },
-    ];
-  }, [appState.otherDebts, bankLoanCalculation, crownMoneyLoanCalculation]);
-
   const monthTicks = Array.from({ length: 13 }, (_, i) => i);
 
   const accordionItems = [
@@ -725,10 +737,10 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
                     <div className="grid grid-cols-2 gap-4">
                         <DonutChartCard 
                             title="Bank" 
-                            homeLoanPrincipal={bankLoanCalculation.year1PrimaryLoanPrincipal}
-                            otherDebtsPrincipal={bankLoanCalculation.year1OtherDebtsPrincipal}
+                            homeLoanPrincipal={bankYear1.principal}
+                            otherDebtsPrincipal={0}
                             homeLoanInterest={bankYear1.homeLoanInterest} 
-                            otherDebtsInterest={bankYear1.otherDebtsInterest} 
+                            otherDebtsInterest={0} 
                             showInterestAmount={false} 
                             displayMode="largePrincipal"
                         />
@@ -776,55 +788,7 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
           )
       },
       {
-        title: "7. Other Debts Strategy Breakdown",
-        content: (
-            <div className="space-y-6">
-                 {appState.otherDebts.length > 0 ? (
-                    <>
-                        <p className="text-sm text-[var(--text-color-muted)]">This section breaks down how the Crown Money "debt avalanche" strategy tackles your other debts compared to the bank simply treating them as a separate monthly expense.</p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                              <div>
-                                  <h4 className="text-center text-[var(--text-color-muted)] mb-2">Other Debts Payoff Time (Years)</h4>
-                                  <div style={{ width: '100%', height: 250 }}>
-                                    <ResponsiveContainer>
-                                        <BarChart data={otherDebtsChartData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
-                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)"/>
-                                            <XAxis type="category" dataKey="name" hide={true} />
-                                            <YAxis stroke="var(--text-color)" domain={[0, 'dataMax + 2']} tickFormatter={(tick) => tick.toFixed(0)} label={{ value: 'Years', angle: -90, position: 'insideLeft', fill: 'var(--text-color-muted)' }} />
-                                            <RechartsTooltip content={<CustomBarTooltip formatter={(value: number) => `${value.toFixed(1)} years`} unit="years" />} cursor={{fill: 'var(--card-bg-color)'}} />
-                                            <Legend verticalAlign="top" wrapperStyle={{color: "var(--text-color-muted)"}} />
-                                            <Bar dataKey="Bank" fill="var(--chart-color-bank)" barSize={60} />
-                                            <Bar dataKey="Crown Money" fill="var(--chart-color-crown)" barSize={60} />
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                  </div>
-                              </div>
-                              <div>
-                                  <h4 className="text-center text-[var(--text-color-muted)] mb-2">Other Debts Interest Paid ($)</h4>
-                                  <div style={{ width: '100%', height: 250 }}>
-                                    <ResponsiveContainer>
-                                        <BarChart data={otherDebtsInterestChartData} margin={{ top: 20, right: 30, left: 10, bottom: 5 }}>
-                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)"/>
-                                            <XAxis type="category" dataKey="name" hide={true} />
-                                            <YAxis stroke="var(--text-color)" tickFormatter={formatChartCurrency} label={{ value: '$', angle: -90, position: 'insideLeft', fill: 'var(--text-color-muted)' }} />
-                                            <RechartsTooltip content={<CustomBarTooltip formatter={(value: number) => formatCurrency(value)} unit="currency" />} cursor={{fill: 'var(--card-bg-color)'}}/>
-                                            <Legend verticalAlign="top" wrapperStyle={{color: "var(--text-color-muted)"}}/>
-                                            <Bar dataKey="Bank" fill="var(--chart-color-bank)" barSize={60} />
-                                            <Bar dataKey="Crown Money" fill="var(--chart-color-crown)" barSize={60} />
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                  </div>
-                              </div>
-                          </div>
-                     </>
-                 ) : (
-                    <p className="text-center text-sm text-[var(--text-color-muted)] p-4">No other debts have been added. Add them on the 'Current Loan' tab.</p>
-                )}
-            </div>
-        )
-      },
-      {
-          title: "8. Detailed Comparison Table",
+          title: "7. Detailed Comparison Table",
           content: (
             <>
               {isCrownLoanValid ? (
@@ -854,12 +818,10 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
                          <div className='flex items-center justify-center gap-2 mb-2'><h4 className="text-center font-semibold text-base text-[var(--text-color-muted)]">Interest Paid Breakdown</h4><Tooltip text="The total interest you will pay over the entire life of the loan. A lower number means more of your money stays in your pocket."><InfoIcon className="h-4 w-4 text-[var(--text-color-muted)]"/></Tooltip></div>
                           <div className="grid grid-cols-2 gap-4">
                               <div className="text-center p-3 rounded-lg space-y-2"><p className="text-xs font-medium text-[var(--chart-color-bank)] mb-1">BANK</p>
-                                <p className="text-xs">Home Loan:</p><p className="text-lg font-bold">{isBankLoanValid ? formatCurrency(bankLoanCalculation.primaryLoanInterest) : 'N/A'}</p>
-                                <p className="text-xs">Other Debts:</p><p className="text-lg font-bold">{isBankLoanValid ? formatCurrency(bankLoanCalculation.otherDebtsInterest) : 'N/A'}</p>
+                                <p className="text-xs">Home Loan:</p><p className="text-lg font-bold">{isBankLoanValid ? formatCurrency(bankLoanCalculation.totalInterest) : 'N/A'}</p>
                               </div>
                               <div className="text-center p-3 rounded-lg bg-[var(--chart-color-crown)]/10 space-y-2"><p className="text-xs font-medium text-[var(--chart-color-crown)] mb-1">CROWN MONEY 🏆</p>
-                                <p className="text-xs">Home Loan:</p><p className="text-lg font-bold text-[var(--chart-color-crown)]">{isCrownLoanValid ? formatCurrency(crownMoneyLoanCalculation.primaryLoanInterest) : 'N/A'}</p>
-                                <p className="text-xs">Other Debts:</p><p className="text-lg font-bold text-[var(--chart-color-crown)]">{isCrownLoanValid ? formatCurrency(crownMoneyLoanCalculation.otherDebtsInterest) : 'N/A'}</p>
+                                <p className="text-xs">Total Consolidated Debt:</p><p className="text-lg font-bold text-[var(--chart-color-crown)]">{isCrownLoanValid ? formatCurrency(crownMoneyLoanCalculation.totalInterest) : 'N/A'}</p>
                               </div>
                           </div>
                       </div>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppState, OtherDebt } from '../types';
 import Card from './common/Card';
 import SliderInput from './common/SliderInput';
@@ -6,20 +6,22 @@ import EditableField from './common/EditableField';
 import { UsersIcon, BanknotesIcon, ChartBarIcon, InfoIcon, PercentIcon } from './common/IconComponents';
 import Tooltip from './common/Tooltip';
 import { calculatePIPayment } from '../hooks/useMortgageCalculations';
+import { useDebounce } from '../hooks/useDebounce';
 
 interface Props {
   appState: AppState;
   setAppState: React.Dispatch<React.SetStateAction<AppState>>;
   calculations: any;
+  setWarningToast: (message: string) => void;
 }
 
-const OtherDebtsSection: React.FC<Props> = ({ appState, setAppState }) => {
+const DebtConsolidationSection: React.FC<Props> = ({ appState, setAppState }) => {
     const { otherDebts } = appState;
 
     const handleDebtChange = (id: number, field: keyof OtherDebt, value: any) => {
         setAppState(prev => ({
             ...prev,
-            otherDebts: prev.otherDebts.map(debt => debt.id === id ? { ...debt, [field]: value } : debt)
+            otherDebts: (prev.otherDebts || []).map(debt => debt.id === id ? { ...debt, [field]: value } : debt)
         }));
     };
 
@@ -33,11 +35,11 @@ const OtherDebtsSection: React.FC<Props> = ({ appState, setAppState }) => {
             frequency: 'monthly',
             remainingTerm: 5,
         };
-        setAppState(prev => ({ ...prev, otherDebts: [...prev.otherDebts, newDebt] }));
+        setAppState(prev => ({ ...prev, otherDebts: [...(prev.otherDebts || []), newDebt] }));
     };
 
     const removeDebt = (id: number) => {
-        setAppState(prev => ({ ...prev, otherDebts: prev.otherDebts.filter(debt => debt.id !== id) }));
+        setAppState(prev => ({ ...prev, otherDebts: (prev.otherDebts || []).filter(debt => debt.id !== id) }));
     };
 
     const inputClasses = "w-full bg-[var(--input-bg-color)] p-2 rounded-md border border-[var(--input-border-color)] focus:outline-none focus:ring-2 focus:ring-[var(--input-border-focus-color)]";
@@ -46,14 +48,14 @@ const OtherDebtsSection: React.FC<Props> = ({ appState, setAppState }) => {
     return (
         <Card title={
             <div className="flex items-center gap-2">
-                <span>Other Debts (e.g., Car Loans, Credit Cards)</span>
-                <Tooltip text="Add any other debts here. For the Bank scenario, these are paid off separately. For the Crown scenario, these debts are automatically consolidated into your primary home loan to be paid off aggressively.">
+                <span>Do you have any other debts you want to consolidate with Crown Money?</span>
+                <Tooltip text="Add any other debts you wish to consolidate into the Crown Money scenario. This will have NO IMPACT on the Bank scenario or the Loan Summary on this page.">
                     <InfoIcon className="h-4 w-4 text-[var(--text-color-muted)]"/>
                 </Tooltip>
             </div>
         }>
             <div className="space-y-4">
-                {otherDebts.map(debt => (
+                {(otherDebts || []).map(debt => (
                     <div key={debt.id} className="p-4 bg-black/10 dark:bg-white/5 rounded-lg relative space-y-4">
                         <button onClick={() => removeDebt(debt.id)} className="absolute top-2 right-2 text-red-400 hover:text-red-600 text-2xl font-bold z-10">×</button>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -101,9 +103,12 @@ const OtherDebtsSection: React.FC<Props> = ({ appState, setAppState }) => {
 };
 
 
-const Tab1_CurrentLoan: React.FC<Props> = ({ appState, setAppState, calculations }) => {
+const Tab1_CurrentLoan: React.FC<Props> = ({ appState, setAppState, calculations, setWarningToast }) => {
   const { loan, people } = appState;
   const { bankLoanCalculation } = calculations;
+
+  const [repaymentInput, setRepaymentInput] = useState(String(loan.repayment));
+  const debouncedLoan = useDebounce(loan, 500);
 
   const handleLoanChange = (field: keyof typeof loan, value: any) => {
     setAppState(prev => ({ ...prev, loan: { ...prev.loan, [field]: value } }));
@@ -141,14 +146,51 @@ const Tab1_CurrentLoan: React.FC<Props> = ({ appState, setAppState, calculations
   const formatCurrency = (value: number) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
 
   const netLoanAmount = Math.max(0, loan.amount - (loan.offsetBalance || 0));
-  const minPIRepayment = calculatePIPayment(netLoanAmount, loan.interestRate, 30, loan.frequency);
   const lvr = loan.propertyValue > 0 ? (loan.amount / loan.propertyValue) * 100 : 0;
+  
+  useEffect(() => {
+    setRepaymentInput(String(loan.repayment));
+  }, [loan.repayment]);
 
   const handleRepaymentBlur = () => {
-    if (loan.repayment < minPIRepayment) {
-      handleLoanChange('repayment', Math.ceil(minPIRepayment));
+    const numericValue = parseFloat(repaymentInput);
+    
+    if (repaymentInput.trim() === '' || isNaN(numericValue)) {
+      setRepaymentInput(String(loan.repayment)); // Reset to last known good value
+      return;
+    }
+    
+    const netLoanAmount = Math.max(0, loan.amount - (loan.offsetBalance || 0));
+    if (netLoanAmount <= 0) {
+      handleLoanChange('repayment', numericValue);
+      return;
+    }
+    const minPIRepayment = calculatePIPayment(netLoanAmount, loan.interestRate, 30, loan.frequency);
+
+    if (numericValue < minPIRepayment) {
+      const newRepayment = Math.ceil(minPIRepayment);
+      handleLoanChange('repayment', newRepayment); // This updates global, which syncs back to local
+      setWarningToast(`Repayment was too low. Adjusted to minimum of ${formatCurrency(newRepayment)}.`);
+    } else {
+      handleLoanChange('repayment', numericValue);
     }
   };
+
+  useEffect(() => {
+    const { amount, offsetBalance, interestRate, frequency, repayment } = debouncedLoan;
+    const netLoanAmount = Math.max(0, amount - (offsetBalance || 0));
+    if (netLoanAmount <= 0) return;
+
+    // Standard 30 year term for minimum calculation
+    const minPIRepayment = calculatePIPayment(netLoanAmount, interestRate, 30, frequency);
+
+    if (repayment < minPIRepayment) {
+      const newRepayment = Math.ceil(minPIRepayment);
+      setAppState(prev => ({ ...prev, loan: { ...prev.loan, repayment: newRepayment } }));
+      setWarningToast(`Repayment was too low. Adjusted to minimum of ${formatCurrency(newRepayment)}.`);
+    }
+  }, [debouncedLoan.amount, debouncedLoan.interestRate, debouncedLoan.offsetBalance, debouncedLoan.frequency, setAppState, setWarningToast]);
+
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in">
@@ -178,9 +220,9 @@ const Tab1_CurrentLoan: React.FC<Props> = ({ appState, setAppState, calculations
                 <div className="relative flex-grow">
                   <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-[var(--text-color-muted)]">$</span>
                   <input 
-                    type="number" 
-                    value={loan.repayment} 
-                    onChange={e => handleLoanChange('repayment', parseFloat(e.target.value) || 0)} 
+                    type="text" 
+                    value={repaymentInput} 
+                    onChange={e => setRepaymentInput(e.target.value.replace(/[^0-9]/g, ''))}
                     onBlur={handleRepaymentBlur}
                     className="w-full bg-[var(--input-bg-color)] p-2 pl-7 rounded-md border border-[var(--input-border-color)] focus:outline-none focus:ring-2 focus:ring-[var(--input-border-focus-color)]" 
                   />
@@ -191,11 +233,6 @@ const Tab1_CurrentLoan: React.FC<Props> = ({ appState, setAppState, calculations
                   <option value="monthly">Monthly</option>
                 </select>
               </div>
-              {loan.repayment < minPIRepayment && (
-                <p className="text-xs text-yellow-400 mt-1 print:hidden">
-                    Repayment is below the minimum for a 30-year term ({formatCurrency(Math.ceil(minPIRepayment))}). It will be adjusted.
-                </p>
-              )}
             </div>
           </div>
         </Card>
@@ -229,7 +266,7 @@ const Tab1_CurrentLoan: React.FC<Props> = ({ appState, setAppState, calculations
             ))}
           </div>
         </Card>
-        <OtherDebtsSection appState={appState} setAppState={setAppState} calculations={calculations} />
+        <DebtConsolidationSection appState={appState} setAppState={setAppState} calculations={calculations} setWarningToast={setWarningToast} />
       </div>
 
       {/* Right Column: Outputs */}
@@ -295,7 +332,7 @@ const Tab1_CurrentLoan: React.FC<Props> = ({ appState, setAppState, calculations
                     </div>
                 </div>
                 <p className="text-xs text-center text-[var(--text-color-muted)] mt-4 italic print:hidden">
-                  *Calculations are based on a standard principal and interest amortization formula using the loan details provided.
+                  *Calculations are for the primary home loan only and do not include any other debts.
                 </p>
               </>
             )}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppState, InvestmentProperty, InvestmentPropertyExpense } from '../types';
 import Card from './common/Card';
 import SliderInput from './common/SliderInput';
@@ -6,11 +6,13 @@ import EditableField from './common/EditableField';
 import Tooltip from './common/Tooltip';
 import { InfoIcon, CalendarIcon } from './common/IconComponents';
 import { calculatePIPayment, calculateIOPayment } from '../hooks/useMortgageCalculations';
+import { useDebounce } from '../hooks/useDebounce';
 
 interface Props {
   appState: AppState;
   setAppState: React.Dispatch<React.SetStateAction<AppState>>;
   calculations: any;
+  setWarningToast: (message: string) => void;
 }
 
 const getMonthlyFromAnyFrequency = (amount: number, frequency: 'weekly' | 'fortnightly' | 'monthly' | 'quarterly' | 'annually' ): number => {
@@ -28,10 +30,13 @@ const InvestmentPropertyCard: React.FC<{
     property: InvestmentProperty;
     onUpdate: (id: number, field: keyof InvestmentProperty, value: any) => void;
     onRemove: (id: number) => void;
-    setAppState: React.Dispatch<React.SetStateAction<AppState>>;
-}> = React.memo(({ property, onUpdate, onRemove, setAppState }) => {
+    setWarningToast: (message: string) => void;
+}> = React.memo(({ property, onUpdate, onRemove, setWarningToast }) => {
     const [isStartDateFocused, setIsStartDateFocused] = React.useState(false);
     const [isPurchaseDateFocused, setIsPurchaseDateFocused] = React.useState(false);
+    const [repaymentInput, setRepaymentInput] = useState(String(property.repayment));
+
+    const debouncedProperty = useDebounce(property, 500);
 
     const formatDateForDisplay = (isoDate: string | undefined): string => {
         if (!isoDate || !/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) {
@@ -84,18 +89,6 @@ const InvestmentPropertyCard: React.FC<{
     };
 
     const netLoanAmount = Math.max(0, property.loanAmount - (property.offsetBalance || 0));
-    const remainingTerm = getRemainingTerm();
-
-    const minRepayment = property.loanType === 'P&I' 
-        ? calculatePIPayment(netLoanAmount, property.interestRate, remainingTerm, property.repaymentFrequency)
-        : calculateIOPayment(netLoanAmount, property.interestRate, property.repaymentFrequency);
-        
-    const handleRepaymentBlur = () => {
-        if (property.repayment < minRepayment) {
-            onUpdate(property.id, 'repayment', Math.ceil(minRepayment));
-        }
-    };
-
 
     const monthlyRental = getMonthlyFromAnyFrequency(property.rentalIncome, property.rentalIncomeFrequency);
     const monthlyRepayment = getMonthlyFromAnyFrequency(property.repayment, property.repaymentFrequency);
@@ -103,6 +96,65 @@ const InvestmentPropertyCard: React.FC<{
     const netCashflow = monthlyRental - monthlyRepayment - monthlyExpenses;
 
     const formatCurrency = (value: number) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
+
+    useEffect(() => {
+        setRepaymentInput(String(property.repayment));
+    }, [property.repayment]);
+
+    const handleRepaymentBlur = () => {
+        const numericValue = parseFloat(repaymentInput);
+
+        if (repaymentInput.trim() === '' || isNaN(numericValue)) {
+            setRepaymentInput(String(property.repayment));
+            return;
+        }
+
+        const netLoanAmount = Math.max(0, property.loanAmount - (property.offsetBalance || 0));
+        if (netLoanAmount <= 0) {
+            onUpdate(property.id, 'repayment', numericValue);
+            return;
+        }
+        const remainingTerm = getRemainingTerm();
+        const minRepayment = property.loanType === 'P&I'
+            ? calculatePIPayment(netLoanAmount, property.interestRate, remainingTerm, property.repaymentFrequency)
+            : calculateIOPayment(netLoanAmount, property.interestRate, property.repaymentFrequency);
+
+        if (numericValue < minRepayment) {
+            const newRepayment = Math.ceil(minRepayment);
+            onUpdate(property.id, 'repayment', newRepayment);
+            setWarningToast(`Repayment for '${property.address}' was too low. Adjusted to minimum of ${formatCurrency(newRepayment)}.`);
+        } else {
+            onUpdate(property.id, 'repayment', numericValue);
+        }
+    };
+    
+    useEffect(() => {
+        const { id, address, loanAmount, offsetBalance, interestRate, loanTerm, loanStartDate, loanType, repayment, repaymentFrequency } = debouncedProperty;
+
+        const netLoanAmount = Math.max(0, loanAmount - (offsetBalance || 0));
+        if (netLoanAmount <= 0) return;
+
+        const getRemainingTermForDebounced = () => {
+            const startDate = new Date(loanStartDate);
+            const today = new Date();
+             if (isNaN(startDate.getTime())) return loanTerm;
+
+            const yearsElapsed = (today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+            return Math.max(0.1, loanTerm - yearsElapsed);
+        };
+        const remainingTerm = getRemainingTermForDebounced();
+        if (remainingTerm <= 0) return;
+
+        const minRepayment = loanType === 'P&I'
+            ? calculatePIPayment(netLoanAmount, interestRate, remainingTerm, repaymentFrequency)
+            : calculateIOPayment(netLoanAmount, interestRate, repaymentFrequency);
+        
+        if (repayment < minRepayment) {
+            const newRepayment = Math.ceil(minRepayment);
+            onUpdate(id, 'repayment', newRepayment);
+            setWarningToast(`Repayment for '${address}' was too low. Adjusted to minimum of ${formatCurrency(newRepayment)}.`);
+        }
+    }, [debouncedProperty.loanAmount, debouncedProperty.offsetBalance, debouncedProperty.interestRate, debouncedProperty.loanTerm, debouncedProperty.loanStartDate, debouncedProperty.loanType, debouncedProperty.repaymentFrequency, onUpdate, setWarningToast]);
     
     const titleClasses = "text-lg font-bold text-[var(--title-color)]";
     const inputClasses = "w-full bg-[var(--input-bg-color)] p-2 rounded-md border border-[var(--input-border-color)] focus:outline-none focus:ring-2 focus:ring-[var(--input-border-focus-color)]";
@@ -198,11 +250,10 @@ const InvestmentPropertyCard: React.FC<{
                             <div className="relative flex-grow">
                                 <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-[var(--text-color-muted)]">$</span>
                                 <input 
-                                    type="number" 
-                                    value={property.repayment} 
-                                    onChange={e => onUpdate(property.id, 'repayment', parseFloat(e.target.value) || 0)} 
+                                    type="text" 
+                                    value={repaymentInput} 
+                                    onChange={e => setRepaymentInput(e.target.value.replace(/[^0-9]/g, ''))}
                                     onBlur={handleRepaymentBlur}
-                                    min={Math.ceil(minRepayment)}
                                     className={`${inputClasses} pl-7`} 
                                 />
                             </div>
@@ -214,11 +265,6 @@ const InvestmentPropertyCard: React.FC<{
                                 <option value="annually">Annually</option>
                             </select>
                         </div>
-                        {minRepayment > 0 && (
-                            <p className="text-xs text-red-400 mt-1 print:hidden">
-                                Min. {property.loanType} Repayment: {formatCurrency(Math.ceil(minRepayment))}
-                            </p>
-                        )}
                          <div className="mt-2 flex gap-2">
                             <button
                                 onClick={handleCalculateIO}
@@ -320,6 +366,20 @@ const InvestmentPropertyCard: React.FC<{
                             <span className="font-bold text-lg" style={{ color: netCashflow >= 0 ? 'var(--color-positive-text)' : 'var(--color-negative-text)' }}>Net Monthly Cashflow</span>
                             <span className="font-extrabold text-2xl" style={{ color: netCashflow >= 0 ? 'var(--color-positive-text)' : 'var(--color-negative-text)' }}>{formatCurrency(netCashflow)}</span>
                         </div>
+                        <div className="mt-3 text-xs space-y-1 pt-2 border-t border-black/10 dark:border-white/10">
+                            <div className="flex justify-between items-center text-[var(--text-color-muted)]">
+                                <span>Rental Income (Monthly):</span>
+                                <span className="text-[var(--color-positive-text)] font-medium">+{formatCurrency(monthlyRental)}</span>
+                            </div>
+                             <div className="flex justify-between items-center text-[var(--text-color-muted)]">
+                                <span>Loan Repayments (Monthly):</span>
+                                <span className="text-[var(--color-negative-text)] font-medium">-{formatCurrency(monthlyRepayment)}</span>
+                            </div>
+                             <div className="flex justify-between items-center text-[var(--text-color-muted)]">
+                                <span>Total Expenses (Monthly):</span>
+                                <span className="text-[var(--color-negative-text)] font-medium">-{formatCurrency(monthlyExpenses)}</span>
+                            </div>
+                        </div>
                     </div>
 
                 </div>
@@ -329,7 +389,7 @@ const InvestmentPropertyCard: React.FC<{
 });
 
 
-const Tab_InvestmentProperties: React.FC<Props> = ({ appState, setAppState, calculations }) => {
+const Tab_InvestmentProperties: React.FC<Props> = ({ appState, setAppState, calculations, setWarningToast }) => {
     
     const handleAddProperty = () => {
         const today = new Date().toISOString().split('T')[0];
@@ -400,7 +460,7 @@ const Tab_InvestmentProperties: React.FC<Props> = ({ appState, setAppState, calc
                     property={prop}
                     onUpdate={handlePropertyUpdate}
                     onRemove={handleRemoveProperty}
-                    setAppState={setAppState}
+                    setWarningToast={setWarningToast}
                 />
             ))}
 
