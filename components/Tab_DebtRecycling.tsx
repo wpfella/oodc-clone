@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import { AppState } from '../types';
 import Card from './common/Card';
@@ -32,7 +33,7 @@ const CustomTooltip: React.FC<{ active?: boolean, payload?: any[], label?: strin
     if (active && payload && payload.length) {
         return (
             <div className="p-3 bg-[var(--tooltip-bg-color)] border border-[var(--border-color)] rounded-lg text-sm shadow-lg print:hidden space-y-1">
-                <p className="label text-[var(--tooltip-text-color)] font-bold mb-1">{`Year: ${label}`}</p>
+                <p className="label text-[var(--tooltip-text-color)] font-bold mb-1">{`Year: ${Number(label).toFixed(2)}`}</p>
                 {payload.map((pld: any, index: number) => (
                     <div key={index} className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: pld.stroke || pld.fill }}></div>
@@ -45,13 +46,18 @@ const CustomTooltip: React.FC<{ active?: boolean, payload?: any[], label?: strin
     return null;
 };
 
+// --- Image Assets ---
+const ICONS = {
+    DEBT_RECYCLING_DIAGRAM: "https://storage.googleapis.com/crown_money/Images%20%26%20Icons/Images/Debt%20Recycling%20Works.png"
+};
 
 const DebtRecyclingVisualGuide: React.FC<{ appState: AppState, calculations: any }> = ({ appState, calculations }) => {
     const { surplus, crownMoneyLoanCalculation } = calculations;
     const { debtRecyclingInvestmentRate, debtRecyclingLoanInterestRate, marginalTaxRate, debtRecyclingPercentage } = appState;
     
+    // We retain these calculations to display dynamic context in the text explanation below the image
     const { amountToRecycle, grossReturn, netProfit, interestCost, year1CrownPrincipalPaid } = useMemo(() => {
-        const principalPaid = crownMoneyLoanCalculation.year1PrimaryOnlyPrincipalPaid;
+        const principalPaid = crownMoneyLoanCalculation.year1PrimaryOnlyPrincipalPaid || 0;
 
         const examplePrincipalPaid = principalPaid > 1000 ? principalPaid : 37055; // Fallback for initial load
 
@@ -67,103 +73,21 @@ const DebtRecyclingVisualGuide: React.FC<{ appState: AppState, calculations: any
     
     const surplusPerYear = surplus * 12;
 
-    // --- Icon Components ---
-    const IconStep1 = () => (
-        <svg viewBox="0 0 100 100" className="w-full h-full"><g stroke="#38bdf8" strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M70 45a20 20 0 00-40 0h-10v50h60v-50z"/><path d="M85 55l-10-10m-5 15l-10-10m-5 15l-10-10m-5 15l-10-10m-5 15l-10-10"/></g><path d="M50 75a10 10 0 100-20 10 10 0 000 20z" fill="#4ade80"/><path d="M54 60h-8v2h8zm0 5h-8v2h8zm-8 5h8v2h-8z" fill="white"/></svg>
-    );
-    const IconStep2 = () => (
-        <svg viewBox="0 0 100 100" className="w-full h-full"><path d="M50 15L5 45h10v45h70v-45h10z" stroke="#38bdf8" strokeWidth="4" fill="none" strokeLinejoin="round"/><path d="M40 90v-20h20v20" stroke="#38bdf8" strokeWidth="4" fill="none" strokeLinejoin="round"/><path d="M25 55L50 75l25-20" stroke="#4ade80" strokeWidth="5" fill="none" strokeLinecap="round"/><path d="M42 75l8 8 8-8" stroke="#4ade80" strokeWidth="5" fill="none" strokeLinecap="round"/></svg>
-    );
-    const IconStep3 = () => (
-        <svg viewBox="0 0 100 100" className="w-full h-full"><path d="M50 15L5 45h10v45h70v-45h10z" stroke="#38bdf8" strokeWidth="4" fill="none" strokeLinejoin="round"/><path d="M40 90v-20h20v20" stroke="#38bdf8" strokeWidth="4" fill="none" strokeLinejoin="round"/><path d="M50 35L75 55 50 75 25 55z" fill="#4ade80"/><path d="M70 55h-40" stroke="white" strokeWidth="5" fill="none" strokeLinecap="round"/><path d="M38 47l-8 8 8 8" stroke="white" strokeWidth="5" fill="none" strokeLinecap="round"/></svg>
-    );
-    const IconStep4 = () => (
-        <svg viewBox="0 0 100 100" className="w-full h-full"><g fill="#4ade80"><rect x="15" y="70" width="14" height="20" rx="3"/><rect x="33" y="50" width="14" height="40" rx="3"/><rect x="51" y="30" width="14" height="60" rx="3"/><rect x="69" y="10" width="14" height="80" rx="3"/></g></svg>
-    );
-    const IconStep5 = () => (
-        <svg viewBox="0 0 100 100" className="w-full h-full"><path d="M50 10a40 40 0 110 80 40 40 0 010-80" stroke="#4ade80" strokeWidth="8" fill="none" strokeDasharray="200 50" strokeLinecap="round" transform="rotate(-45 50 50)"/><path d="M40 20l-15 15 15 15" stroke="#4ade80" strokeWidth="8" fill="none" strokeLinecap="round"/><circle cx="50" cy="50" r="18" fill="#4ade80"/><text x="50" y="58" textAnchor="middle" fontSize="24" fontWeight="bold" fill="white">$</text></svg>
-    );
-
-    const Step = ({ stepNum, icon, title, description }: { stepNum: number, icon: React.ReactNode, title: string, description: React.ReactNode }) => (
-        <div className="flex flex-col items-center text-center w-48">
-            <div className="relative w-24 h-24 mb-2">
-                <div className="absolute -top-2 -left-2 w-8 h-8 bg-[var(--title-color)] text-white rounded-full flex items-center justify-center font-bold text-lg z-10">{stepNum}</div>
-                {icon}
-            </div>
-            <h4 className="font-bold text-sm leading-tight">{title}</h4>
-            <p className="text-xs text-[var(--text-color-muted)] mt-1">{description}</p>
-        </div>
-    );
-    
-    const Arrow = ({ rotation = 0 }: { rotation?: number }) => (
-        <svg viewBox="0 0 24 24" className="w-10 h-10 text-sky-400 mx-4" style={{ transform: `rotate(${rotation}deg)` }}>
-            <path fill="currentColor" d="M14 18l-1.41-1.41L16.17 13H4v-2h12.17l-3.58-3.59L14 6l6 6-6 6z"/>
-        </svg>
-    );
-
-
     return (
         <div className="p-4 rounded-lg overflow-x-auto">
             <h3 className="text-xl font-bold text-center text-[var(--title-color)] mb-8">How Debt Recycling Works (5-Step Cycle)</h3>
-            <div className="relative min-w-[1000px]">
-                <div className="flex justify-between items-center mb-8">
-                     <Step
-                        stepNum={1}
-                        icon={<IconStep1 />}
-                        title="Your Income & Surplus"
-                        description={<>Start with your budget surplus of <strong className="text-[var(--text-color)]">{formatCurrency(surplusPerYear, 0)}/yr</strong>.</>}
-                    />
-                    <Arrow />
-                     <Step
-                        stepNum={2}
-                        icon={<IconStep2 />}
-                        title="Flood the Loan Principal"
-                        description="Use your surplus and reinvested profits to pay down your home loan faster."
-                    />
-                    <Arrow />
-                     <Step
-                        stepNum={3}
-                        icon={<IconStep3 />}
-                        title="Re-borrow from Equity"
-                        description={<>Re-draw paid-down equity (e.g., <strong className="text-[var(--text-color)]">{formatCurrency(amountToRecycle, 0)}</strong>) as a new loan.</>}
-                    />
-                </div>
-
-                <svg className="absolute top-40 left-0 w-full h-40 pointer-events-none">
-                    {/* Down arrow from step 3 */}
-                    <path d="M890 0 V 50" stroke="#38bdf8" strokeWidth="4" strokeLinecap="round" markerEnd="url(#arrowhead)"/>
-                    {/* Left arrow from step 4 */}
-                    <path d="M890 50 H 500" stroke="#38bdf8" strokeWidth="4" strokeLinecap="round" />
-                    {/* Left arrow from step 5 */}
-                    <path d="M350 50 H 130" stroke="#38bdf8" strokeWidth="4" strokeLinecap="round" markerEnd="url(#arrowhead)" />
-                    {/* Up arrow to step 2 */}
-                    <path d="M130 50 V 0" stroke="#4ade80" strokeWidth="5" strokeLinecap="round" markerEnd="url(#arrowhead-reinvest)"/>
-                    <defs>
-                        <marker id="arrowhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#38bdf8"/></marker>
-                        <marker id="arrowhead-reinvest" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#4ade80"/></marker>
-                    </defs>
-                </svg>
-
-                <div className="flex justify-between items-center flex-row-reverse mt-32">
-                     <Step
-                        stepNum={4}
-                        icon={<IconStep4 />}
-                        title="Invest in Passive Income"
-                        description={<>Generate returns, e.g., <strong className="text-[var(--color-positive-text)]">{formatCurrency(grossReturn, 0)}/yr</strong> at {debtRecyclingInvestmentRate}% p.a.</>}
-                    />
-                    <Step
-                        stepNum={5}
-                        icon={<IconStep5 />}
-                        title="Generate & Reinvest Profits"
-                        description={<>Use net profits (e.g., <strong className="text-[var(--color-positive-text)]">{formatCurrency(netProfit, 0)}/yr</strong>) to make more extra repayments (back to Step 2).</>}
-                    />
-                    <div className="w-48"></div> {/* Spacer to align Step 5 under Step 2 */}
-                </div>
+            
+            <div className="flex justify-center mb-8">
+                <img 
+                    src={ICONS.DEBT_RECYCLING_DIAGRAM} 
+                    alt="Debt Recycling Process Diagram" 
+                    className="max-w-4xl w-full object-contain"
+                />
             </div>
 
-             <div className="mt-12 pt-4 border-t border-dashed border-[var(--border-color)] text-center text-xs text-[var(--text-color-muted)] max-w-4xl mx-auto space-y-2">
+             <div className="mt-4 pt-4 border-t border-dashed border-[var(--border-color)] text-center text-xs text-[var(--text-color-muted)] max-w-4xl mx-auto space-y-2">
                 <h5 className="font-bold text-sm text-[var(--text-color)]">How are these example numbers calculated?</h5>
-                <p><strong className="text-[var(--text-color-muted)]">Step 1 Surplus:</strong> Your total monthly income minus total monthly expenses from the budget tab.</p>
+                <p><strong className="text-[var(--text-color-muted)]">Step 1 Surplus:</strong> Your total monthly income minus total monthly expenses from the budget tab (<strong className="text-[var(--text-color)]">{formatCurrency(surplusPerYear)}/yr</strong>).</p>
                 <p><strong className="text-[var(--text-color-muted)]">Step 3 Re-borrow Amount:</strong> Based on an example of principal paid down in Year 1 of the standard Crown scenario (<strong className="text-[var(--text-color)]">{formatCurrency(year1CrownPrincipalPaid)}</strong>), multiplied by your chosen 'Percentage to Recycle'.</p>
                 <p><strong className="text-[var(--text-color-muted)]">Step 4 Gross Return:</strong> Amount Re-borrowed (<strong className="text-[var(--text-color)]">{formatCurrency(amountToRecycle)}</strong>) × Assumed Investment Return (<strong className="text-[var(--text-color)]">{debtRecyclingInvestmentRate}%</strong>).</p>
                 <p><strong className="text-[var(--text-color-muted)]">Step 5 Net Profit:</strong> (Gross Return - Interest Cost) - Tax on Profit. The investment loan interest (<strong className="text-[var(--text-color)]">{formatCurrency(interestCost)}</strong>) is tax-deductible against your marginal tax rate.</p>
@@ -174,22 +98,48 @@ const DebtRecyclingVisualGuide: React.FC<{ appState: AppState, calculations: any
 
 
 const Tab_DebtRecycling: React.FC<Props> = ({ appState, setAppState, calculations }) => {
-    const { crownMoneyLoanCalculation, debtRecyclingCalculation, debtRecyclingWealthProjection } = calculations;
-
-    if (crownMoneyLoanCalculation.termInYears === Infinity) {
-        return (
-            <Card>
-                <div className="text-center text-yellow-400 p-4 bg-yellow-900/50 rounded-lg">
-                    <p className="font-bold text-lg">Cannot Calculate Scenarios</p>
-                    <p>Your primary home loan must be payable under the standard Crown Money strategy first. Check your budget on the 'Income & Expenses' tab.</p>
-                </div>
-            </Card>
-        );
-    }
+    const { debtRecyclingCalculation, crownMoneyLoanCalculation, debtRecyclingWealthProjection } = calculations;
+    const { loan, debtRecyclingEnabled, debtRecyclingInvestmentRate, debtRecyclingLoanInterestRate, marginalTaxRate, debtRecyclingPercentage } = appState;
 
     const handleStateChange = (field: keyof AppState, value: any) => {
         setAppState(prev => ({ ...prev, [field]: value }));
     };
+
+    // Calculate chart data
+    const chartData = useMemo(() => {
+        if (!debtRecyclingCalculation || !debtRecyclingCalculation.investmentLoanSchedule || !debtRecyclingCalculation.investmentPortfolioSchedule) {
+            return [];
+        }
+        
+        const scheduleLength = debtRecyclingCalculation.investmentLoanSchedule.length;
+        const data = [];
+        
+        for (let i = 0; i < scheduleLength; i+=12) { // sample yearly
+             const year = i / 12;
+             const loanBal = debtRecyclingCalculation.investmentLoanSchedule[i]?.balance || 0;
+             const portVal = debtRecyclingCalculation.investmentPortfolioSchedule[i]?.value || 0;
+             const homeLoanBal = debtRecyclingCalculation.amortizationSchedule[i]?.remainingBalance || 0;
+             
+             data.push({
+                 year,
+                 'Investment Loan': loanBal,
+                 'Portfolio Value': portVal,
+                 'Home Loan Balance': homeLoanBal,
+                 'Net Wealth': portVal - loanBal - homeLoanBal // Rough estimate for chart
+             });
+        }
+        return data;
+
+    }, [debtRecyclingCalculation]);
+
+    if (!debtRecyclingCalculation || debtRecyclingCalculation.termInYears === Infinity) {
+        return (
+            <div className="text-center p-8">
+                <h3 className="text-xl font-bold text-[var(--text-color)]">Debt Recycling Unavailable</h3>
+                <p className="text-[var(--text-color-muted)]">Your Crown Money loan calculation must be valid (payable) to enable Debt Recycling projections.</p>
+            </div>
+        );
+    }
 
     const snowballChartData = useMemo(() => {
         const { loan } = appState;
@@ -353,66 +303,41 @@ const Tab_DebtRecycling: React.FC<Props> = ({ appState, setAppState, calculation
 
     }, [debtRecyclingCalculation, appState]);
 
-
     const accordionItems = [
         {
-            title: "1. Debt Recycling Setup & Assumptions",
-            content: (
-                <div className="space-y-6">
-                    <p className="text-sm text-[var(--text-color-muted)]">
-                        Debt recycling is a strategy where you use the equity in your home to invest. As you pay down your home loan principal, you can borrow back that same amount as a separate, tax-deductible investment loan. The goal is to generate investment returns that are higher than the cost of the investment loan interest. The net profit is then used to pay off your non-deductible home loan even faster.
-                    </p>
-                    <SliderInput
-                        label={
-                            <div className="flex items-center gap-1">
-                                <span>Percentage of Principal to Recycle</span>
-                                <Tooltip text="Controls what percentage of the paid-down home loan principal is re-borrowed and invested. 100% uses the full amount available, while a lower percentage represents a more conservative approach.">
-                                    <InfoIcon className="h-4 w-4" />
-                                </Tooltip>
-                            </div>
-                        }
-                        value={appState.debtRecyclingPercentage}
-                        onChange={val => handleStateChange('debtRecyclingPercentage', val)}
-                        min={0} max={100} step={1} unit="%"
-                    />
-                    <SliderInput
-                        label={
-                            <div className="flex items-center gap-1">
-                                <span>Assumed Annual Investment Return</span>
-                                <Tooltip text="The average annual return you expect from the investment portfolio. Historically, diversified portfolios have returned 7-8% p.a. over the long term.">
-                                    <InfoIcon className="h-4 w-4" />
-                                </Tooltip>
-                            </div>
-                        }
-                        value={appState.debtRecyclingInvestmentRate}
-                        onChange={val => handleStateChange('debtRecyclingInvestmentRate', val)}
-                        min={1} max={15} step={0.25} unit="%"
-                    />
-                    <SliderInput
-                        label="Investment Loan Interest Rate"
-                        value={appState.debtRecyclingLoanInterestRate}
-                        onChange={val => handleStateChange('debtRecyclingLoanInterestRate', val)}
-                        min={1} max={15} step={0.05} unit="%"
-                    />
-                    <SliderInput
-                        label={
-                            <div className="flex items-center gap-1">
-                                <span>Marginal Tax Rate</span>
-                                <Tooltip text="Your highest income tax rate. This is used to calculate both the tax payable on investment returns and the tax deduction benefit on the investment loan interest. The final *after-tax* profit/loss is then used to accelerate your home loan payoff. (e.g., $45k-$120k income is 32.5%)">
-                                    <InfoIcon className="h-4 w-4" />
-                                </Tooltip>
-                            </div>
-                        }
-                        value={appState.marginalTaxRate}
-                        onChange={val => handleStateChange('marginalTaxRate', val)}
-                        min={0} max={45} step={0.5} unit="%"
-                    />
-                </div>
-            ),
+            title: "1. How Debt Recycling Works",
+            content: <DebtRecyclingVisualGuide appState={appState} calculations={calculations} />
         },
         {
-            title: "2. How Debt Recycling Works: A Visual Guide",
-            content: <DebtRecyclingVisualGuide appState={appState} calculations={calculations} />
+            title: "2. Configuration & Assumptions",
+            content: (
+                <div className="space-y-6">
+                    <SliderInput 
+                        label="Percentage of Principal to Recycle" 
+                        value={debtRecyclingPercentage} 
+                        onChange={val => handleStateChange('debtRecyclingPercentage', val)} 
+                        min={0} max={100} step={5} unit="%" 
+                    />
+                    <SliderInput 
+                        label="Investment Growth Rate" 
+                        value={debtRecyclingInvestmentRate} 
+                        onChange={val => handleStateChange('debtRecyclingInvestmentRate', val)} 
+                        min={0} max={15} step={0.1} unit="%" 
+                    />
+                    <SliderInput 
+                        label="Investment Loan Interest Rate" 
+                        value={debtRecyclingLoanInterestRate} 
+                        onChange={val => handleStateChange('debtRecyclingLoanInterestRate', val)} 
+                        min={0} max={15} step={0.1} unit="%" 
+                    />
+                    <SliderInput 
+                        label="Marginal Tax Rate" 
+                        value={marginalTaxRate} 
+                        onChange={val => handleStateChange('marginalTaxRate', val)} 
+                        min={0} max={50} step={0.5} unit="%" 
+                    />
+                </div>
+            )
         },
         {
             title: "3. The Snowball Effect: Year-by-Year Growth",
@@ -422,7 +347,7 @@ const Tab_DebtRecycling: React.FC<Props> = ({ appState, setAppState, calculation
                         This chart shows the "snowball effect" of debt recycling. As you pay down your non-deductible Home Loan Balance (bad debt), you build up your wealth-generating Investment Portfolio (good debt). The number inside each bar shows the value of your investment portfolio at that year.
                     </p>
                     <div className="w-full h-[400px]">
-                        <ResponsiveContainer>
+                        <ResponsiveContainer minWidth={0} minHeight={0}>
                             <BarChart data={snowballChartData} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
                                 <XAxis dataKey="label" stroke="var(--text-color)" tick={{ fontSize: 12 }} />
@@ -445,7 +370,7 @@ const Tab_DebtRecycling: React.FC<Props> = ({ appState, setAppState, calculation
                  endResult ? (
                     <div className="p-4 bg-black/10 dark:bg-white/5 rounded-lg space-y-4">
                         <div className="text-center">
-                            <p className="text-lg">In <strong className="text-3xl text-[var(--title-color)]">{endResult.termInYears.toFixed(1)} years</strong> your home is Debt Free.</p>
+                            <p className="text-lg">In <strong className="text-3xl text-[var(--title-color)]">{endResult.termInYears.toFixed(2)} years</strong> your home is Debt Free.</p>
                             <p className="text-sm text-[var(--text-color-muted)]">At this point, you have built a passive income machine:</p>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left p-4 rounded-lg bg-[var(--card-bg-color)]">
@@ -483,9 +408,9 @@ const Tab_DebtRecycling: React.FC<Props> = ({ appState, setAppState, calculation
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-center">
                     <div className="p-3 bg-black/10 dark:bg-white/5 rounded-lg space-y-1">
                         <h4 className="text-sm text-[var(--text-color-muted)]">Home Loan Payoff Time</h4>
-                        <p className="text-3xl font-bold text-[var(--chart-color-crown)]">{debtRecyclingCalculation.termInYears.toFixed(1)} Years</p>
+                        <p className="text-3xl font-bold text-[var(--chart-color-crown)]">{debtRecyclingCalculation.termInYears.toFixed(2)} Years</p>
                         <p className="text-xs text-[var(--color-positive-text)] font-semibold">
-                            {(crownMoneyLoanCalculation.termInYears - debtRecyclingCalculation.termInYears).toFixed(1)} years sooner
+                            {(crownMoneyLoanCalculation.termInYears - debtRecyclingCalculation.termInYears).toFixed(2)} years sooner
                         </p>
                     </div>
                     <div className="p-3 bg-black/10 dark:bg-white/5 rounded-lg space-y-1">
@@ -539,7 +464,7 @@ const Tab_DebtRecycling: React.FC<Props> = ({ appState, setAppState, calculation
                         This chart projects your total net worth (Home Equity + Investments - Remaining Debts) over time, comparing all three scenarios. Note the significant acceleration in wealth creation with the Debt Recycling strategy.
                     </p>
                     <div className="w-full h-[400px]">
-                        <ResponsiveContainer>
+                        <ResponsiveContainer minWidth={0} minHeight={0}>
                             <AreaChart data={netWorthData} margin={{ top: 5, right: 20, left: 10, bottom: 20 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
                                 <XAxis dataKey="age" name="Age" stroke="var(--text-color)" tick={{ fontSize: 12 }} label={{ value: 'Age', position: 'insideBottom', offset: -10, fill: 'var(--text-color-muted)' }}/>
@@ -563,7 +488,7 @@ const Tab_DebtRecycling: React.FC<Props> = ({ appState, setAppState, calculation
                         This chart shows how your debt is transformed. The non-deductible home loan (purple area) is paid down, while the tax-deductible investment loan (pink area) grows. The solid yellow line shows that your total debt level remains high initially, but its structure becomes much more efficient for wealth creation.
                     </p>
                     <div className="w-full h-[400px]">
-                        <ResponsiveContainer>
+                        <ResponsiveContainer minWidth={0} minHeight={0}>
                             <ComposedChart data={debtCompositionData} stackOffset="none" margin={{ top: 5, right: 20, left: 10, bottom: 20 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
                                 <XAxis dataKey="year" type="number" domain={[0, 'dataMax']} stroke="var(--text-color)" tick={{ fontSize: 12 }} label={{ value: 'Years', position: 'insideBottom', offset: -10, fill: 'var(--text-color-muted)' }}/>

@@ -1,5 +1,3 @@
-
-
 import React, { useMemo } from 'react';
 import { AppState } from '../types';
 import Card from './common/Card';
@@ -195,7 +193,7 @@ const Tab_InvestmentOODC: React.FC<Props> = ({ appState, setAppState, calculatio
                             <p className="mt-2">This illustrates how the Crown Money strategy reduces your overall debt while focusing its entire power on one debt at a time to eliminate it rapidly before moving to the next.</p>
                         </div>
                         <div className="w-full h-[500px]">
-                            <ResponsiveContainer>
+                            <ResponsiveContainer minWidth={0} minHeight={0}>
                                 <ComposedChart data={totalDebtData} margin={{ top: 20, right: 20, left: 10, bottom: 20 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
                                     <XAxis 
@@ -268,7 +266,7 @@ const Tab_InvestmentOODC: React.FC<Props> = ({ appState, setAppState, calculatio
                     This graph illustrates the reduction of your entire portfolio's debt (home + investments) over time, comparing the bank's plan to the Crown Money simultaneous payoff strategy.
                 </p>
                 <div className="w-full h-[400px]">
-                    <ResponsiveContainer>
+                    <ResponsiveContainer minWidth={0} minHeight={0}>
                         <AreaChart data={totalDebtData} margin={{ top: 5, right: 20, left: -10, bottom: 20 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
                             <XAxis 

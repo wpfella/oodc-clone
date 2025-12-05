@@ -369,7 +369,7 @@ const Tab_Reports: React.FC<Props> = ({ appState, calculations }) => {
       
       <Card title="Visual Comparison: Principal vs Interest">
         <div className="w-full h-80">
-          <ResponsiveContainer>
+          <ResponsiveContainer minWidth={0} minHeight={0}>
             <BarChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color) print:stroke-gray-200" />
               <XAxis dataKey="name" stroke="var(--text-color) print:stroke-black" />
@@ -447,4 +447,4 @@ const Tab_Reports: React.FC<Props> = ({ appState, calculations }) => {
   );
 };
 
-export default Tab_Reports;
+export default React.memo(Tab_Reports);

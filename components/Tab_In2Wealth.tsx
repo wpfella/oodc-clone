@@ -1,10 +1,11 @@
-import React, { useEffect } from 'react';
+
+import React, { useEffect, useState, useMemo } from 'react';
 import { AppState } from '../types';
 import Card from './common/Card';
 import SliderInput from './common/SliderInput';
-import { InfoIcon } from './common/IconComponents';
+import { InfoIcon, UsersIcon } from './common/IconComponents';
 import Tooltip from './common/Tooltip';
-import { AreaChart, Area, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, Legend, BarChart, Bar, ReferenceDot, ReferenceArea } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, Legend, BarChart, Bar, ReferenceArea } from 'recharts';
 
 interface Props {
   appState: AppState;
@@ -118,27 +119,37 @@ const Tab_In2Wealth: React.FC<Props> = ({ appState, setAppState, calculations })
   const { 
       bankLoanCalculation, 
       crownMoneyLoanCalculation, 
-      retirementWealthProjection, 
+      wealthCalcs, // Ensure wealthCalcs is destructured
       netWorthProjection,
-      homeValueAtRetirement,
-      bankDebtAtRetirement,
-      bankEquityAtRetirement,
-      bankCashAvailableAtRetirement,
-      totalBankNetPositionAtRetirement,
       surplus,
   } = calculations;
   
   const isBankLoanValid = bankLoanCalculation.termInYears !== Infinity;
   const isCrownLoanValid = crownMoneyLoanCalculation.termInYears !== Infinity;
   
-  const youngestPerson = appState.people.reduce((prev, curr) => (prev.age < curr.age ? prev : curr), appState.people[0] || { age: 0 });
-  const minRetirementAge = Math.ceil(youngestPerson.age + crownMoneyLoanCalculation.termInYears);
+  // Person Logic
+  const sortedPeople = [...appState.people].sort((a, b) => a.age - b.age);
+  const youngestPerson = sortedPeople[0] || { id: 0, name: 'Person 1', age: 30 };
+  
+  // State for toggling person view
+  const [viewPersonId, setViewPersonId] = useState<number>(youngestPerson.id);
 
+  // Determine current view context
+  const viewingPerson = appState.people.find(p => p.id === viewPersonId) || youngestPerson;
+  const ageOffset = viewingPerson.age - youngestPerson.age;
+  const hasMultiplePeopleWithDifferentAges = appState.people.length > 1 && appState.people.some(p => p.age !== youngestPerson.age);
+
+  const minRetirementAge = Math.ceil(viewingPerson.age + crownMoneyLoanCalculation.termInYears);
+
+  // Auto-adjust global retirement age if it's impossible for the selected view
   useEffect(() => {
-    if (isCrownLoanValid && isFinite(minRetirementAge) && appState.idealRetirementAge < minRetirementAge) {
-        setAppState(prev => ({ ...prev, idealRetirementAge: minRetirementAge }));
+    // Only adjust if the *current global setting* is impossible for the youngest (base calculation)
+    // The slider allows range, but we want to ensure data validity.
+    const baseMinRetirement = Math.ceil(youngestPerson.age + crownMoneyLoanCalculation.termInYears);
+    if (isCrownLoanValid && isFinite(baseMinRetirement) && appState.idealRetirementAge < baseMinRetirement) {
+        setAppState(prev => ({ ...prev, idealRetirementAge: baseMinRetirement }));
     }
-  }, [minRetirementAge, appState.idealRetirementAge, setAppState, isCrownLoanValid]);
+  }, [crownMoneyLoanCalculation.termInYears, youngestPerson.age, appState.idealRetirementAge, setAppState, isCrownLoanValid]);
 
 
   if (!isBankLoanValid || !isCrownLoanValid) {
@@ -160,7 +171,7 @@ const Tab_In2Wealth: React.FC<Props> = ({ appState, setAppState, calculations })
   const monthlyInvestment = monthlySavings * (appState.investmentAmountPercentage / 100);
   const monthlyCashInHand = monthlySavings - monthlyInvestment;
   
-  const bankDebtFreeAge = Math.ceil(youngestPerson.age + bankLoanCalculation.termInYears);
+  const bankDebtFreeAge = Math.ceil(viewingPerson.age + bankLoanCalculation.termInYears);
 
   const formatCurrency = (value: number) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
 
@@ -171,32 +182,86 @@ const Tab_In2Wealth: React.FC<Props> = ({ appState, setAppState, calculations })
   const annualSavings = monthlySavings * 12;
   const totalPotentialInvestment = annualSavings * yearsSaved;
 
-  const totalNetPositionAtRetirement = retirementWealthProjection.wealth + retirementWealthProjection.cashInHand + retirementWealthProjection.homeEquity;
+  // --- Transform Data for Selected Person ---
   
+  // 1. Adjust Net Worth Graph Data
+  const adjustedNetWorthProjection = useMemo(() => {
+      return (netWorthProjection || []).map((d: any) => ({
+          ...d,
+          age: d.age + ageOffset
+      }));
+  }, [netWorthProjection, ageOffset]);
+
+  // 2. Find Snapshot Data for Retirement Age
+  const retirementSnapshot = useMemo(() => {
+      const targetAge = appState.idealRetirementAge;
+      // Find the data point where the adjusted age matches the target retirement age
+      // If target is beyond our projection (e.g. user is older), take the last point
+      const exactMatch = adjustedNetWorthProjection.find((d: any) => d.age === targetAge);
+      const lastPoint = adjustedNetWorthProjection[adjustedNetWorthProjection.length - 1];
+      
+      // If we found an exact match, use it. 
+      // If not, and the target is later than our data, use the last point.
+      // If the target is earlier than our data (impossible via slider), use first point.
+      const point = exactMatch || (targetAge > (lastPoint?.age || 0) ? lastPoint : adjustedNetWorthProjection[0]);
+      
+      if (!point) return { bank: 0, crown: 0 };
+      
+      return {
+          bank: point.bank,
+          crown: point.crown
+      };
+  }, [adjustedNetWorthProjection, appState.idealRetirementAge]);
+
+  // 3. Re-calculate Breakdown Stats for Snapshot
+  // We need to fetch the components (Home Equity, Investment Wealth, Cash) for the specific age
+  // Since `wealthCalcs` is based on the youngest person's timeline (Year 0 = Youngest Age),
+  // We need to convert SelectedPersonRetirementAge back to the YoungestPerson's equivalent age to query the calc.
+  const equivalentBaseAge = appState.idealRetirementAge - ageOffset;
+  const snapshotWealthDetails = wealthCalcs ? wealthCalcs(equivalentBaseAge) : { homeEquity: 0, wealth: 0, cashInHand: 0 };
+  
+  // We also need Bank components. 
+  // Bank Equity = Home Value - Remaining Debt.
+  // Bank Cash = Savings accumulated after debt free.
+  // This logic is duplicated from hook but applied to specific age snapshot.
+  const snapshotBankDetails = useMemo(() => {
+      const retirementYearsElapsed = equivalentBaseAge - youngestPerson.age;
+      const initialPropertyValue = appState.loan.propertyValue;
+      const homeValue = initialPropertyValue * Math.pow(1 + (appState.propertyGrowthRate / 100), retirementYearsElapsed);
+      
+      // Find remaining debt from schedule
+      const monthIndex = Math.max(0, Math.floor(retirementYearsElapsed * 12) - 1);
+      const bankDebt = bankLoanCalculation.amortizationSchedule[monthIndex]?.remainingBalance ?? (retirementYearsElapsed * 12 > bankLoanCalculation.termInYears * 12 ? 0 : appState.loan.amount);
+      const equity = homeValue - bankDebt;
+
+      const bankPayoffYears = bankLoanCalculation.termInYears;
+      let cash = 0;
+      if (retirementYearsElapsed > bankPayoffYears) {
+          // If years elapsed is greater than payoff, they have been saving
+          const monthsSaving = (retirementYearsElapsed - bankPayoffYears) * 12;
+          // Simple calc: monthly repayment * months saving
+          const monthlyRepayment = bankLoanCalculation.amortizationSchedule[0]?.principalPaid + bankLoanCalculation.amortizationSchedule[0]?.interestPaid || 0;
+          cash = monthsSaving * monthlyRepayment;
+      }
+      return { homeEquity: equity, cash: cash, total: equity + cash };
+  }, [equivalentBaseAge, youngestPerson.age, appState.loan, appState.propertyGrowthRate, bankLoanCalculation]);
+
+
   const barChartData = [
       { 
         name: 'Net Worth', 
-        'Bank': Math.max(0, totalBankNetPositionAtRetirement),
-        'Crown Money': Math.max(0, totalNetPositionAtRetirement)
+        'Bank': Math.max(0, snapshotBankDetails.total),
+        'Crown Money': Math.max(0, retirementSnapshot.crown)
       },
   ];
   
-  const sliderMin = isFinite(minRetirementAge) ? minRetirementAge : youngestPerson.age;
+  const sliderMin = isFinite(minRetirementAge) ? minRetirementAge : viewingPerson.age;
   const sliderMax = Math.max(sliderMin + 5, 85); 
-  const sliderValue = Math.max(sliderMin, appState.idealRetirementAge); 
+  // Ensure slider value is valid for current view
+  const sliderValue = Math.max(sliderMin, Math.min(appState.idealRetirementAge, sliderMax)); 
   
   // Graph Breakpoint Calculations
   const crownPayoffAge = minRetirementAge;
-  const retirementAge = sliderValue;
-
-  const getNetWorthAtAge = (age: number, scenario: 'crown' | 'bank') => {
-      const dataPoint = netWorthProjection.find((p: any) => p.age === age);
-      return dataPoint ? dataPoint[scenario] : 0;
-  };
-  
-  const crownNetWorthAtCrownPayoff = getNetWorthAtAge(crownPayoffAge, 'crown');
-  const crownNetWorthAtBankPayoff = getNetWorthAtAge(bankDebtFreeAge, 'crown');
-  const crownNetWorthAtRetirement = getNetWorthAtAge(retirementAge, 'crown');
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -206,7 +271,7 @@ const Tab_In2Wealth: React.FC<Props> = ({ appState, setAppState, calculations })
                 label={
                     <div className='flex items-center gap-2'>
                         <span>Ideal Retirement Age</span>
-                        <Tooltip text="Set your target retirement age. The calculator will project your potential wealth at this age if you start investing after paying off your home loan with Crown Money.">
+                        <Tooltip text={`Set your target retirement age. The calculator will project your potential wealth at this age (${sliderValue}) for ${viewingPerson.name}.`}>
                             <InfoIcon className="h-4 w-4 text-[var(--text-color-muted)]"/>
                         </Tooltip>
                     </div>
@@ -221,7 +286,7 @@ const Tab_In2Wealth: React.FC<Props> = ({ appState, setAppState, calculations })
          <div className="mb-6 p-4 border border-dashed border-[var(--border-color)] rounded-lg">
             <div className="flex items-center justify-center gap-1">
                 <h4 className="font-semibold text-[var(--title-color)] text-center mb-3">Your Investment Power</h4>
-                 <Tooltip text="This is your total monthly surplus (Income - Expenses) that becomes available for investing once your loan is paid off with the Crown Money strategy.">
+                 <Tooltip text="This is your total monthly surplus (Income - Expenses) that becomes available for investing once your home loan is paid off with the Crown Money strategy.">
                     <InfoIcon className="h-4 w-4 text-[var(--text-color-muted)] -translate-y-1.5"/>
                 </Tooltip>
             </div>
@@ -299,7 +364,7 @@ const Tab_In2Wealth: React.FC<Props> = ({ appState, setAppState, calculations })
              <p className="text-center text-xs text-[var(--text-color-muted)] -mt-2 p-2 bg-black/10 dark:bg-white/5 rounded-md">
                 Investing in a diversified portfolio of assets like property, the stock market, or index funds has historically produced average returns of 7% or more over the long term.
                 <br/>
-                <strong className="font-semibold">Disclaimer:</strong> This is for illustrative purposes only and does not constitute financial advice. Past performance is not indicative of future results.
+                <strong className="font-semibold">Disclaimer:</strong> This is for illustrative purposes only and does not include financial advice. Past performance is not indicative of future results.
             </p>
             <SliderInput 
                 label={
@@ -317,11 +382,34 @@ const Tab_In2Wealth: React.FC<Props> = ({ appState, setAppState, calculations })
         </div>
       </Card>
 
-      <Card title="Step 2: Your Wealth Projections">
+      <Card 
+        title={
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-2">
+                <span>Step 2: Your Wealth Projections</span>
+                {hasMultiplePeopleWithDifferentAges && (
+                    <div className="flex items-center bg-[var(--input-bg-color)] rounded-full p-1 border border-[var(--border-color)]">
+                        {sortedPeople.map(person => (
+                            <button
+                                key={person.id}
+                                onClick={() => setViewPersonId(person.id)}
+                                className={`px-3 py-1 text-xs font-semibold rounded-full transition-all ${
+                                    viewPersonId === person.id 
+                                    ? 'bg-[var(--title-color)] text-white shadow-sm' 
+                                    : 'text-[var(--text-color-muted)] hover:text-[var(--text-color)]'
+                                }`}
+                            >
+                                {person.name}
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
+        }
+      >
          <div className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="text-center space-y-4 p-4 rounded-lg bg-black/10 dark:bg-white/10">
                 <h4 className="text-lg font-semibold text-[var(--text-color)]">Your Bank's Path</h4>
-                <p className="text-sm text-[var(--text-color-muted)] -mt-3">At Retirement Age {appState.idealRetirementAge}</p>
+                <p className="text-sm text-[var(--text-color-muted)] -mt-3">At Retirement Age {sliderValue}</p>
                  <div className="border-t border-[var(--border-color)] pt-2">
                     <p className="text-sm text-[var(--text-color-muted)] flex items-center justify-center gap-1">
                         <span>Projected Home Equity</span>
@@ -329,12 +417,12 @@ const Tab_In2Wealth: React.FC<Props> = ({ appState, setAppState, calculations })
                             <InfoIcon className="h-4 w-4" />
                         </Tooltip>
                     </p>
-                    <p className="text-2xl font-bold" style={{color: 'var(--chart-color-bank)'}}>{formatCurrency(bankEquityAtRetirement)}</p>
+                    <p className="text-2xl font-bold" style={{color: 'var(--chart-color-bank)'}}>{formatCurrency(snapshotBankDetails.homeEquity)}</p>
                 </div>
                 <div>
                     <p className="text-sm text-[var(--text-color-muted)] flex items-center justify-center gap-1">
                         <span>Wealth from Investments</span>
-                        <Tooltip text="In the bank's scenario, you are still paying your mortgage at this point, so there is no surplus cash from freed-up repayments to invest.">
+                        <Tooltip text="In the bank's scenario, calculations assume no surplus cash is invested until the mortgage is fully paid off.">
                              <InfoIcon className="h-4 w-4" />
                         </Tooltip>
                     </p>
@@ -342,7 +430,7 @@ const Tab_In2Wealth: React.FC<Props> = ({ appState, setAppState, calculations })
                 </div>
                  <div>
                     <p className="text-sm text-[var(--text-color-muted)] uppercase">CASH SPENT ON LIFESTYLE since being debt free</p>
-                    <p className="text-2xl font-bold text-[var(--text-color-muted)]">{formatCurrency(bankCashAvailableAtRetirement)}</p>
+                    <p className="text-2xl font-bold text-[var(--text-color-muted)]">{formatCurrency(snapshotBankDetails.cash)}</p>
                 </div>
                 <hr className="border-[var(--border-color)] border-dashed"/>
                  <div>
@@ -352,12 +440,12 @@ const Tab_In2Wealth: React.FC<Props> = ({ appState, setAppState, calculations })
                             <InfoIcon className="h-4 w-4" />
                         </Tooltip>
                     </p>
-                    <p className="text-4xl font-extrabold" style={{color: 'var(--chart-color-bank)'}}>{formatCurrency(totalBankNetPositionAtRetirement)}</p>
+                    <p className="text-4xl font-extrabold" style={{color: 'var(--chart-color-bank)'}}>{formatCurrency(snapshotBankDetails.total)}</p>
                 </div>
             </div>
              <div className="text-center space-y-4 p-4 rounded-lg bg-black/10 dark:bg-white/10">
                 <h4 className="text-lg font-semibold text-[var(--text-color)]">The Crown Money Path 🏆</h4>
-                <p className="text-sm text-[var(--text-color-muted)] -mt-3">At Retirement Age {appState.idealRetirementAge}</p>
+                <p className="text-sm text-[var(--text-color-muted)] -mt-3">At Retirement Age {sliderValue}</p>
                  <div className="border-t border-[var(--border-color)] pt-2">
                     <p className="text-sm text-[var(--text-color-muted)] flex items-center justify-center gap-1">
                         <span>Projected Home Equity</span>
@@ -365,7 +453,7 @@ const Tab_In2Wealth: React.FC<Props> = ({ appState, setAppState, calculations })
                             <InfoIcon className="h-4 w-4" />
                         </Tooltip>
                     </p>
-                    <p className="text-2xl font-bold" style={{color: 'var(--chart-color-wealth)'}}>{formatCurrency(retirementWealthProjection.homeEquity)}</p>
+                    <p className="text-2xl font-bold" style={{color: 'var(--chart-color-wealth)'}}>{formatCurrency(snapshotWealthDetails.homeEquity)}</p>
                 </div>
                 <div>
                     <p className="text-sm text-[var(--text-color-muted)] flex items-center justify-center gap-1">
@@ -374,11 +462,11 @@ const Tab_In2Wealth: React.FC<Props> = ({ appState, setAppState, calculations })
                             <InfoIcon className="h-4 w-4" />
                         </Tooltip>
                     </p>
-                    <p className="text-2xl font-bold" style={{color: 'var(--chart-color-wealth)'}}>{formatCurrency(retirementWealthProjection.wealth)}</p>
+                    <p className="text-2xl font-bold" style={{color: 'var(--chart-color-wealth)'}}>{formatCurrency(snapshotWealthDetails.wealth)}</p>
                 </div>
                 <div>
                     <p className="text-sm text-[var(--text-color-muted)] uppercase">CASH SPENT ON LIFESTYLE since being debt free</p>
-                    <p className="text-2xl font-bold text-[var(--text-color-muted)]">{formatCurrency(retirementWealthProjection.cashInHand)}</p>
+                    <p className="text-2xl font-bold text-[var(--text-color-muted)]">{formatCurrency(snapshotWealthDetails.cashInHand)}</p>
                 </div>
                 <hr className="border-[var(--border-color)] border-dashed"/>
                 <div>
@@ -388,7 +476,7 @@ const Tab_In2Wealth: React.FC<Props> = ({ appState, setAppState, calculations })
                             <InfoIcon className="h-4 w-4" />
                         </Tooltip>
                     </p>
-                    <p className="text-4xl font-extrabold" style={{color: 'var(--chart-color-wealth)'}}>{formatCurrency(totalNetPositionAtRetirement)}</p>
+                    <p className="text-4xl font-extrabold" style={{color: 'var(--chart-color-wealth)'}}>{formatCurrency(snapshotWealthDetails.wealth + snapshotWealthDetails.cashInHand + snapshotWealthDetails.homeEquity)}</p>
                 </div>
             </div>
         </div>
@@ -398,10 +486,10 @@ const Tab_In2Wealth: React.FC<Props> = ({ appState, setAppState, calculations })
             <div className="lg:col-span-3">
                 <h4 className="text-center font-semibold text-lg text-[var(--text-color)] mb-4">Net Worth Growth Comparison</h4>
                 <div style={{ width: '100%', height: 400 }}>
-                   <ResponsiveContainer>
-                        <AreaChart data={netWorthProjection} margin={{ top: 20, right: 20, left: -10, bottom: 20 }}>
+                   <ResponsiveContainer minWidth={0} minHeight={0}>
+                        <AreaChart data={adjustedNetWorthProjection} margin={{ top: 20, right: 20, left: -10, bottom: 20 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
-                            <XAxis dataKey="age" name="Age" stroke="var(--text-color)" tick={{ fontSize: 12 }} label={{ value: 'Age', position: 'insideBottom', offset: -10, fill: 'var(--text-color-muted)' }}/>
+                            <XAxis dataKey="age" name="Age" stroke="var(--text-color)" tick={{ fontSize: 12 }} label={{ value: `Age (${viewingPerson.name})`, position: 'insideBottom', offset: -10, fill: 'var(--text-color-muted)' }}/>
                             <YAxis stroke="var(--text-color)" tickFormatter={formatChartCurrency} tick={{ fontSize: 12 }} />
                             <RechartsTooltip content={<CustomAreaTooltip formatter={formatCurrency} />} />
                             <Legend wrapperStyle={{fontSize: "14px", color: "var(--text-color-muted)"}} verticalAlign="top" />
@@ -415,89 +503,44 @@ const Tab_In2Wealth: React.FC<Props> = ({ appState, setAppState, calculations })
                                     <stop offset="95%" stopColor="var(--chart-color-crown)" stopOpacity={0}/>
                                 </linearGradient>
                             </defs>
-                            {isCrownLoanValid && isBankLoanValid && bankDebtFreeAge > crownPayoffAge && (
+                            {isCrownLoanValid && isBankLoanValid && bankDebtFreeAge > crownPayoffAge && isFinite(bankDebtFreeAge) && isFinite(crownPayoffAge) && (
                                 <ReferenceArea
                                     x1={crownPayoffAge}
                                     x2={bankDebtFreeAge}
-                                    fill="var(--chart-color-wealth)"
-                                    fillOpacity={0.1}
                                     stroke="var(--chart-color-wealth)"
                                     strokeOpacity={0.3}
-                                    ifOverflow="extendDomain"
-                                    label={{ value: "Investment Headstart", angle: 90, position: "insideTopLeft", fill: "var(--chart-color-wealth)", offset: 20 }}
-                                />
-                            )}
-                            <Area type="monotone" dataKey="bank" name="Bank Net Worth" stroke="var(--chart-color-bank)" fillOpacity={1} fill="url(#colorBankNetWorth)" strokeWidth={2} dot={false}/>
-                            <Area type="monotone" dataKey="crown" name="Crown Money Net Worth 🏆" stroke="var(--chart-color-crown)" fillOpacity={1} fill="url(#colorCrownNetWorth)" strokeWidth={2} dot={false}/>
-
-                            {/* Breakpoint Dots */}
-                            {isFinite(crownPayoffAge) && crownNetWorthAtCrownPayoff > 0 && (
-                                <ReferenceDot
-                                    x={crownPayoffAge}
-                                    y={crownNetWorthAtCrownPayoff}
-                                    r={6}
-                                    fill="var(--chart-color-crown)"
-                                    stroke="var(--bg-color)"
-                                    strokeWidth={2}
-                                    ifOverflow="extendDomain"
-                                    label={{ value: "Home Paid Off 🏆", position: 'top', fill: 'var(--chart-color-crown)', fontSize: 12, dy: -10, fontWeight: 'bold' }}
-                                />
-                            )}
-                            {isFinite(bankDebtFreeAge) && crownNetWorthAtBankPayoff > 0 && bankDebtFreeAge > crownPayoffAge && (
-                                <ReferenceDot
-                                    x={bankDebtFreeAge}
-                                    y={crownNetWorthAtBankPayoff}
-                                    r={6}
-                                    fill="var(--chart-color-crown)"
-                                    stroke="var(--bg-color)"
-                                    strokeWidth={2}
-                                    ifOverflow="extendDomain"
-                                    label={{ value: `vs. Bank Payoff (${formatCurrency(crownNetWorthAtBankPayoff)})`, position: 'top', fill: 'var(--text-color)', fontSize: 12, dy: 15 }}
-                                />
-                            )}
-                            {isFinite(retirementAge) && crownNetWorthAtRetirement > 0 && retirementAge > crownPayoffAge && (
-                                <ReferenceDot
-                                    x={retirementAge}
-                                    y={crownNetWorthAtRetirement}
-                                    r={8}
                                     fill="var(--chart-color-wealth)"
-                                    stroke="var(--bg-color)"
-                                    strokeWidth={2}
+                                    fillOpacity={0.1}
                                     ifOverflow="extendDomain"
-                                    label={{
-                                        value: `Retirement (${formatCurrency(crownNetWorthAtRetirement)})`,
-                                        position: 'top',
-                                        fill: 'var(--chart-color-wealth)',
-                                        fontSize: 12,
-                                        fontWeight: 'bold',
-                                        dy: 20,
-                                        dx: -15,
-                                        textAnchor: 'end'
-                                    }}
                                 />
                             )}
+                            <Area type="monotone" dataKey="bank" stroke="var(--chart-color-bank)" fill="url(#colorBankNetWorth)" fillOpacity={1} strokeWidth={2} name="Bank" />
+                            <Area type="monotone" dataKey="crown" stroke="var(--chart-color-crown)" fill="url(#colorCrownNetWorth)" fillOpacity={1} strokeWidth={2} name="Crown Money" />
                         </AreaChart>
                    </ResponsiveContainer>
                 </div>
+                <p className="text-xs text-center text-[var(--text-color-muted)] mt-3 italic print:hidden">
+                    *The shaded area represents the period where you are investing with Crown Money while still paying off your loan with the Bank.
+                </p>
             </div>
+            
             <div className="lg:col-span-2">
-                <h4 className="text-center font-semibold text-lg text-[var(--text-color)] mb-4">Net Worth at Retirement Age {retirementAge}</h4>
-                <div style={{ width: '100%', height: 400 }}>
-                    <ResponsiveContainer>
-                        <BarChart data={barChartData} layout="vertical" margin={{ top: 20, right: 20, left: 20, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border-color)"/>
-                            <XAxis type="number" stroke="var(--text-color)" tickFormatter={formatChartCurrency} />
-                            <YAxis type="category" dataKey="name" hide />
-                            <RechartsTooltip content={<CustomBarTooltip formatter={formatCurrency} />} cursor={{fill: 'var(--card-bg-color)'}}/>
-                            <Legend wrapperStyle={{fontSize: "14px", color: "var(--text-color-muted)"}} verticalAlign="top" />
-                            <Bar dataKey="Bank" name="Bank Net Worth" fill="var(--chart-color-bank)" barSize={40} />
-                            <Bar dataKey="Crown Money" name="Crown Money Net Worth 🏆" fill="var(--chart-color-crown)" barSize={40} />
+                <h4 className="text-center font-semibold text-lg text-[var(--text-color)] mb-4">Net Worth at Retirement</h4>
+                <div className="h-80">
+                    <ResponsiveContainer minWidth={0} minHeight={0}>
+                        <BarChart data={barChartData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
+                            <XAxis dataKey="name" hide={true} />
+                            <YAxis stroke="var(--text-color)" tickFormatter={formatChartCurrency} />
+                            <RechartsTooltip cursor={{fill: 'rgba(128, 128, 128, 0.1)'}} content={<CustomBarTooltip formatter={formatCurrency} />} />
+                            <Legend wrapperStyle={{color: "var(--text-color-muted)"}} />
+                            <Bar dataKey="Bank" fill="var(--chart-color-bank)" barSize={60} />
+                            <Bar dataKey="Crown Money" fill="var(--chart-color-crown)" barSize={60} />
                         </BarChart>
                     </ResponsiveContainer>
                 </div>
             </div>
         </div>
-
       </Card>
     </div>
   );

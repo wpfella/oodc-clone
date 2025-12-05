@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { AppState, InvestmentProperty, InvestmentPropertyExpense } from '../types';
 import Card from './common/Card';
@@ -114,47 +115,36 @@ const InvestmentPropertyCard: React.FC<{
             onUpdate(property.id, 'repayment', numericValue);
             return;
         }
-        const remainingTerm = getRemainingTerm();
-        const minRepayment = property.loanType === 'P&I'
-            ? calculatePIPayment(netLoanAmount, property.interestRate, remainingTerm, property.repaymentFrequency)
-            : calculateIOPayment(netLoanAmount, property.interestRate, property.repaymentFrequency);
+        
+        // Allow repayment to be as low as Interest Only, even if P&I is selected, to allow long terms.
+        const minRepayment = calculateIOPayment(netLoanAmount, property.interestRate, property.repaymentFrequency);
 
         if (numericValue < minRepayment) {
             const newRepayment = Math.ceil(minRepayment);
             onUpdate(property.id, 'repayment', newRepayment);
-            setWarningToast(`Repayment for '${property.address}' was too low. Adjusted to minimum of ${formatCurrency(newRepayment)}.`);
+            setWarningToast(`Repayment for '${property.address}' was too low to cover interest. Adjusted to minimum of ${formatCurrency(newRepayment)}.`);
         } else {
             onUpdate(property.id, 'repayment', numericValue);
         }
     };
     
     useEffect(() => {
-        const { id, address, loanAmount, offsetBalance, interestRate, loanTerm, loanStartDate, loanType, repayment, repaymentFrequency } = debouncedProperty;
+        const { id, address, loanAmount, offsetBalance, interestRate, repayment, repaymentFrequency } = debouncedProperty;
 
         const netLoanAmount = Math.max(0, loanAmount - (offsetBalance || 0));
         if (netLoanAmount <= 0) return;
 
-        const getRemainingTermForDebounced = () => {
-            const startDate = new Date(loanStartDate);
-            const today = new Date();
-             if (isNaN(startDate.getTime())) return loanTerm;
-
-            const yearsElapsed = (today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
-            return Math.max(0.1, loanTerm - yearsElapsed);
-        };
-        const remainingTerm = getRemainingTermForDebounced();
-        if (remainingTerm <= 0) return;
-
-        const minRepayment = loanType === 'P&I'
-            ? calculatePIPayment(netLoanAmount, interestRate, remainingTerm, repaymentFrequency)
-            : calculateIOPayment(netLoanAmount, interestRate, repaymentFrequency);
+        // Check against Interest Only to allow flexibility
+        const minRepayment = calculateIOPayment(netLoanAmount, interestRate, repaymentFrequency);
         
         if (repayment < minRepayment) {
             const newRepayment = Math.ceil(minRepayment);
-            onUpdate(id, 'repayment', newRepayment);
-            setWarningToast(`Repayment for '${address}' was too low. Adjusted to minimum of ${formatCurrency(newRepayment)}.`);
+            if (repayment !== newRepayment) { // Prevent unnecessary update to break loop
+                onUpdate(id, 'repayment', newRepayment);
+                setWarningToast(`Repayment for '${address}' was too low. Adjusted to minimum of ${new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(newRepayment)}.`);
+            }
         }
-    }, [debouncedProperty.loanAmount, debouncedProperty.offsetBalance, debouncedProperty.interestRate, debouncedProperty.loanTerm, debouncedProperty.loanStartDate, debouncedProperty.loanType, debouncedProperty.repaymentFrequency, onUpdate, setWarningToast]);
+    }, [debouncedProperty.loanAmount, debouncedProperty.offsetBalance, debouncedProperty.interestRate, debouncedProperty.repaymentFrequency, onUpdate, setWarningToast]);
     
     const titleClasses = "text-lg font-bold text-[var(--title-color)]";
     const inputClasses = "w-full bg-[var(--input-bg-color)] p-2 rounded-md border border-[var(--input-border-color)] focus:outline-none focus:ring-2 focus:ring-[var(--input-border-focus-color)]";

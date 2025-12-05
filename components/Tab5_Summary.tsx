@@ -1,5 +1,4 @@
 
-
 import React, { useMemo } from 'react';
 import { AppState, AmortizationDataPoint, InvestmentProperty, Frequency } from '../types';
 import Card from './common/Card';
@@ -69,7 +68,7 @@ const Tab5_Summary: React.FC<Props> = ({ appState, setAppState, calculations, on
   };
   const formatYears = (value: number) => {
     if (isNaN(value) || !isFinite(value)) return 'N/A';
-    return `${value.toFixed(1)} Years`;
+    return `${value.toFixed(2)} Years`;
   };
   
   const isBankLoanValid = bankLoanCalculation.termInYears !== Infinity;
@@ -297,8 +296,8 @@ const Tab5_Summary: React.FC<Props> = ({ appState, setAppState, calculations, on
                           <p className="text-3xl font-bold my-1 text-[var(--chart-color-crown)] print:text-green-700">{formatYears(totalCrownPayoffYears)}</p>
                       </div>
                       <div className="mt-2 text-sm">
-                          <SummaryItem label="Primary Home Payoff" value={`${crownMoneyLoanCalculation.termInYears.toFixed(1)} Years`} />
-                          {hasInvestments && canCalculateInvestmentSavings && <SummaryItem label="All Investments Payoff" value={`${investmentLoanCalculations.totalCrownTerm.toFixed(1)} Years`} />}
+                          <SummaryItem label="Primary Home Payoff" value={`${crownMoneyLoanCalculation.termInYears.toFixed(2)} Years`} />
+                          {hasInvestments && canCalculateInvestmentSavings && <SummaryItem label="All Investments Payoff" value={`${investmentLoanCalculations.totalCrownTerm.toFixed(2)} Years`} />}
                       </div>
                   </div>
               </div>

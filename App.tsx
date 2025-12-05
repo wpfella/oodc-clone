@@ -202,6 +202,17 @@ const zapierMessages = {
     error: 'Record upload failed. Please try again.',
 };
 
+const sanitizeAppState = (state: AppState): AppState => {
+    const safeState = { ...state };
+    // Cap Interest Rate to prevent infinite loops on load
+    if (safeState.loan.interestRate > 20) safeState.loan.interestRate = 20;
+    if (safeState.loan.interestRate < 0) safeState.loan.interestRate = 0;
+    
+    // Cap Repayments (simple sanity check)
+    if (safeState.loan.repayment < 0) safeState.loan.repayment = 0;
+    
+    return safeState;
+};
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>(Tab.CurrentLoan);
@@ -294,7 +305,7 @@ const App: React.FC = () => {
              mergedState.allPartiesInAttendance = parsedState.allPartiesInAttendance ? 'Yes- Couple' : 'Only 1 of 2 Showed';
         }
 
-        return mergedState;
+        return sanitizeAppState(mergedState);
       }
     } catch (error) {
       console.error("Failed to parse saved state from localStorage", error);

@@ -242,7 +242,7 @@ const Tab2_InterestBreakdown: React.FC<Props> = ({ appState, setAppState, calcul
                 Notice how the interest (pink) dominates the early years of the loan repayments.
             </p>
             <div style={{ width: '100%', height: 400 }}>
-                <ResponsiveContainer>
+                <ResponsiveContainer minWidth={0} minHeight={0}>
                    <BarChart data={annualBankChartData} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
                       <XAxis 
@@ -277,7 +277,7 @@ const Tab2_InterestBreakdown: React.FC<Props> = ({ appState, setAppState, calcul
                 This chart illustrates the proportion of your payments that go towards interest versus reducing your principal debt in the first year.
             </p>
             <div style={{ width: '100%', height: 400 }}>
-                <ResponsiveContainer>
+                <ResponsiveContainer minWidth={0} minHeight={0}>
                   <PieChart>
                     <Pie
                       data={firstYearPieData}

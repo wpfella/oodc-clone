@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { AppState, AmortizationDataPoint, LoanDetails } from '../types';
 import Card from './common/Card';
@@ -53,7 +54,7 @@ const CustomBarTooltip: React.FC<{ active?: boolean, payload?: any[], formatter:
                         <p style={{ color: 'var(--tooltip-text-color-muted)' }}>
                             {`Savings: `}
                             <span className="font-semibold" style={{color: 'var(--tooltip-text-color-positive)'}}>
-                                {unit === 'years' ? `${difference.toFixed(1)} years` : formatter(difference)}
+                                {unit === 'years' ? `${difference.toFixed(2)} years` : formatter(difference)}
                             </span>
                         </p>
                     </>
@@ -90,7 +91,7 @@ const CustomAreaTooltip: React.FC<{ active?: boolean, payload?: any[], label?: s
                     <p style={{ color: `var(--tooltip-text-color-${type === 'income' ? 'positive' : 'negative'})` }}>
                         {`${type === 'income' ? 'Income: +' : 'Expense: -'}${formatter(amount)}`}
                     </p>
-                    <p className="text-xs" style={{ color: 'var(--tooltip-text-color-muted)' }}>{`At Year ${parseFloat(label || '0').toFixed(1)}`}</p>
+                    <p className="text-xs" style={{ color: 'var(--tooltip-text-color-muted)' }}>{`At Year ${parseFloat(label || '0').toFixed(2)}`}</p>
                 </div>
             );
         }
@@ -103,7 +104,7 @@ const CustomAreaTooltip: React.FC<{ active?: boolean, payload?: any[], label?: s
 
         return (
             <div className="p-3 bg-[var(--tooltip-bg-color)] border border-[var(--border-color)] rounded-lg text-sm shadow-lg print:hidden space-y-1">
-                <p className="label text-[var(--tooltip-text-color)] font-bold mb-1">{`Year: ${label} (Age: ${Math.floor(age)})`}</p>
+                <p className="label text-[var(--tooltip-text-color)] font-bold mb-1">{`Year: ${Number(label).toFixed(2)} (Age: ${Math.floor(age)})`}</p>
                  <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: 'var(--chart-color-bank)' }}></div>
                     <p className="font-semibold" style={{ color: 'var(--tooltip-text-color)' }}>{`Bank Balance: ${formatter(bankData?.value || 0)}`}</p>
@@ -184,7 +185,15 @@ const FutureEventsImpactSummary: React.FC<{ appState: AppState; calculations: an
             offsetBalance: 0,
         };
         // Calculate baseline WITHOUT any future events
-        return calculateAmortization(crownLoanForCalc, { strategy: 'crown' });
+        const result = calculateAmortization(crownLoanForCalc, { strategy: 'crown' });
+        
+        let effectiveTermInYears = result.termInYears;
+        if (result.amortizationSchedule.length > 0 && result.termInYears !== Infinity) {
+             const offset = loan.offsetBalance || 0;
+             // In this context (0 offset in calc), Net Term is same as Gross Term unless offset passed (which is 0)
+             // So this is fine.
+        }
+        return result;
 
     }, [appState, calculations]);
 
@@ -202,7 +211,7 @@ const FutureEventsImpactSummary: React.FC<{ appState: AppState; calculations: an
     }
     
     const isPositive = termDiff > 0;
-    const termText = `${Math.abs(termDiff).toFixed(1)} years ${isPositive ? 'sooner' : 'later'}`;
+    const termText = `${Math.abs(termDiff).toFixed(2)} years ${isPositive ? 'sooner' : 'later'}`;
     const interestText = `${formatCurrency(Math.abs(interestDiff))} in interest`;
     
     return (
@@ -237,13 +246,6 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
   
   const youngestPersonAge = Math.min(...people.map((p: any) => p.age));
 
-  const maxStartDebt = Math.max(
-      loan.amount - (loan.offsetBalance || 0), 
-      initialCrownLoanCalculation.amortizationSchedule[0]?.totalRemainingBalance ?? 0
-  );
-  const yAxisMax = Math.ceil((maxStartDebt + 50000) / 50000) * 50000;
-
-
   const adjustedCrownLoanCalculation = useMemo(() => {
     if (additionalMonthlyIncome === 0) {
         return initialCrownLoanCalculation;
@@ -270,10 +272,14 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
         ...loan, amount: netPrimaryLoanAmount, offsetBalance: 0, interestRate: crownMoneyInterestRate,
     };
     
-    return calculateAmortization(crownLoanDetailsForPrimary, {
+    const result = calculateAmortization(crownLoanDetailsForPrimary, {
         extraMonthlyPayment: extraPayment,
         futureChanges, futureLumpSums, strategy: 'crown'
     });
+
+    // Consistent logic: In this 'what if', we start with Net Debt (offset 0), so Term is Net Term.
+    // No adjustment needed for termInYears here as offsetBalance is 0.
+    return result;
 
   }, [appState, additionalMonthlyIncome, initialCrownLoanCalculation, totalMonthlyIncome, totalMonthlyExpenses]);
   
@@ -298,16 +304,56 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
 
     const maxMonths = Math.max(bankSchedule.length, crownSchedule.length);
     
+    // Track if we have already plotted the zero point for Crown Money
+    let hasCrownHitZero = false;
+
     for (let i = 0; i < maxMonths; i++) {
         const month = i + 1;
-        const bankBal = bankSchedule[i]?.remainingBalance ?? 0;
-        const crownBal = crownSchedule[i]?.totalRemainingBalance ?? 0;
         
+        const bankPoint = bankSchedule[i];
+        const bankBalGross = bankPoint?.remainingBalance ?? 0;
+        const bankOffset = bankPoint?.offsetBalance ?? 0;
+        const bankBalNet = Math.max(0, bankBalGross - bankOffset);
+
+        // Crown Logic
+        const crownPoint = crownSchedule[i];
+        let crownVal: number | null = null;
+
+        // Determine raw net balance for Crown
+        let crownNet = 0;
+        if (crownPoint) {
+             const crownBalGross = (crownPoint as any)?.totalRemainingBalance ?? crownPoint?.remainingBalance ?? 0;
+             const crownOffset = crownPoint?.offsetBalance ?? 0;
+             crownNet = Math.max(0, crownBalGross - crownOffset);
+        } else {
+             crownNet = 0;
+        }
+
+        if (hasCrownHitZero) {
+            // If we already hit zero previously, all subsequent points are null (don't draw line)
+            crownVal = null;
+        } else {
+            if (crownNet <= 0.01) {
+                // We hit zero for the first time
+                crownVal = 0;
+                hasCrownHitZero = true;
+            } else {
+                // Still have balance
+                crownVal = crownNet;
+            }
+        }
+        
+        // Edge case: If crown schedule ended (undefined point) but we haven't marked zero yet
+        if (!crownPoint && !hasCrownHitZero) {
+             crownVal = 0;
+             hasCrownHitZero = true;
+        }
+
         data.push({
             year: month / 12,
             age: youngestPersonAge + (month / 12),
-            'Bank': bankBal > 0 ? bankBal : 0,
-            'Crown Money': crownBal > 0 ? crownBal : 0
+            'Bank': bankBalNet > 0 ? bankBalNet : 0,
+            'Crown Money': crownVal
         });
     }
     
@@ -321,8 +367,6 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
     if (bankSchedule.length === 0 && crownSchedule.length === 0) return [];
     
     const bankStartDebt = loan.amount - (loan.offsetBalance || 0);
-    
-    // Calculate the correct starting debt for Crown Money (total debt)
     const consolidatedAmount = (appState.otherDebts || []).reduce((sum, debt) => sum + debt.amount, 0);
     const crownStartDebt = (loan.amount - (loan.offsetBalance || 0)) + consolidatedAmount;
 
@@ -333,16 +377,32 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
     }];
     
     for (let i = 0; i < 12; i++) {
+        const bankPoint = bankSchedule[i];
+        const bankBalGross = bankPoint?.remainingBalance ?? 0;
+        const bankOffset = bankPoint?.offsetBalance ?? 0;
+        const bankBalNet = bankPoint ? Math.max(0, bankBalGross - bankOffset) : 0;
+
+        const crownPoint = crownSchedule[i];
+        const crownBalGross = (crownPoint as any)?.totalRemainingBalance ?? crownPoint?.remainingBalance ?? 0;
+        const crownOffset = crownPoint?.offsetBalance ?? 0;
+        const crownBalNet = crownPoint ? Math.max(0, crownBalGross - crownOffset) : 0;
+
         data.push({
             month: i + 1,
-            'Bank': bankSchedule[i]?.remainingBalance ?? data[i]['Bank'],
-            'Crown Money': crownSchedule[i]?.totalRemainingBalance ?? data[i]['Crown Money'],
+            'Bank': bankBalNet,
+            'Crown Money': crownBalNet,
         });
     }
 
     return data;
   }, [bankLoanCalculation.amortizationSchedule, crownMoneyLoanCalculation.amortizationSchedule, loan.amount, loan.offsetBalance, appState.otherDebts]);
   
+  const maxStartDebt = Math.max(
+      loan.amount - (loan.offsetBalance || 0), 
+      loanBalanceChartData[0]['Crown Money'] || 0
+  );
+  const yAxisMax = Math.ceil((maxStartDebt + 50000) / 50000) * 50000;
+
   const handleRateChange = (value: number) => {
     setAppState(prev => ({ ...prev, crownMoneyInterestRate: value }));
   };
@@ -450,7 +510,7 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
           <div className="text-center p-2 bg-black/5 dark:bg-white/5 rounded-lg flex flex-col justify-between">
               <h5 className={`font-semibold ${title.includes('Crown') ? 'text-lg' : 'text-base'}`}>{title}</h5>
               <div className={`w-full relative ${displayMode === 'largePrincipal' ? 'h-52' : 'h-40'}`}>
-                  <ResponsiveContainer>
+                  <ResponsiveContainer minWidth={0} minHeight={0}>
                       <PieChart>
                           <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="60%" outerRadius="80%" paddingAngle={2}>
                               <Cell fill="var(--chart-color-principal)" />
@@ -599,7 +659,7 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
                         This chart shows the Bank's **home loan** trajectory vs. Crown Money's **total consolidated debt** trajectory, illustrating the impact of consolidation and accelerated repayment.
                     </p>
                     <div className="w-full h-[500px]">
-                        <ResponsiveContainer>
+                        <ResponsiveContainer minWidth={0} minHeight={0}>
                             <ComposedChart data={loanBalanceChartData} margin={{ top: 5, right: 20, left: 10, bottom: 20 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
                                 <XAxis dataKey="year" type="number" domain={[0, 'dataMax']} ticks={xTicks} stroke="var(--text-color)" tick={{ fontSize: 12 }} label={{ value: 'Years', position: 'insideBottom', offset: -10, fill: 'var(--text-color-muted)' }} />
@@ -610,7 +670,7 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
                                     <linearGradient id="colorBank" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="var(--chart-color-bank)" stopOpacity={0.7}/><stop offset="95%" stopColor="var(--chart-color-bank)" stopOpacity={0}/></linearGradient>
                                     <linearGradient id="colorCrown" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="var(--chart-color-crown)" stopOpacity={0.7}/><stop offset="95%" stopColor="var(--chart-color-crown)" stopOpacity={0}/></linearGradient>
                                 </defs>
-                                {isCrownLoanValid && isBankLoanValid && bankLoanCalculation.termInYears > crownMoneyLoanCalculation.termInYears && (
+                                {isCrownLoanValid && isBankLoanValid && bankLoanCalculation.termInYears > crownMoneyLoanCalculation.termInYears && isFinite(bankLoanCalculation.termInYears) && isFinite(crownMoneyLoanCalculation.termInYears) && (
                                     <ReferenceArea
                                         x1={crownMoneyLoanCalculation.termInYears}
                                         x2={bankLoanCalculation.termInYears}
@@ -631,10 +691,6 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
 
                                 <Area type="linear" dataKey="Crown Money" name="Crown Money (Total Debt)" stroke="none" fillOpacity={1} fill="url(#colorCrown)" legendType="none" />
                                 <Line type="linear" name="Crown Money (Total Debt)" dataKey="Crown Money" stroke="var(--chart-color-crown)" strokeWidth={3} dot={false} />
-                                
-                                {isCrownLoanValid && isFinite(crownMoneyLoanCalculation.termInYears) && crownMoneyLoanCalculation.termInYears > 0 && (
-                                    <ReferenceDot x={crownMoneyLoanCalculation.termInYears} y={0} r={6} fill="var(--chart-color-crown)" stroke="var(--bg-color)" strokeWidth={2} ifOverflow="extendDomain" label={{ value: "Total Debt Free 🏆", position: 'top', fill: 'var(--chart-color-crown)', fontSize: 12, dy: -10, fontWeight: 'bold' }} />
-                                )}
                             </ComposedChart>
                         </ResponsiveContainer>
                     </div>
@@ -652,7 +708,7 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
                     This chart zooms in on the crucial first year, showing the rapid debt reduction achieved by the Crown Money strategy compared to a standard bank loan from day one.
                 </p>
                 <div className="w-full h-[400px]">
-                    <ResponsiveContainer>
+                    <ResponsiveContainer minWidth={0} minHeight={0}>
                         <AreaChart data={first12MonthsData} margin={{ top: 5, right: 20, left: 10, bottom: 20 }}>
                             <defs>
                                 <linearGradient id="colorBank12m" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="var(--chart-color-bank)" stopOpacity={0.7}/><stop offset="95%" stopColor="var(--chart-color-bank)" stopOpacity={0}/></linearGradient>
@@ -686,19 +742,19 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
                             {otherDebtsInterestSaved > 0 && <p>Other Debts Savings: <span className="font-semibold text-[var(--color-positive-text)]">{formatCurrency(otherDebtsInterestSaved)}</span></p>}
                           </div>
                           <p className="text-lg text-[var(--text-color-muted)] mt-4">Years saved:</p>
-                          <p className="text-5xl font-extrabold my-2" style={{color: 'var(--chart-color-crown)'}}>{(bankLoanCalculation.termInYears - crownMoneyLoanCalculation.termInYears).toFixed(1)}</p>
+                          <p className="text-5xl font-extrabold my-2" style={{color: 'var(--chart-color-crown)'}}>{(bankLoanCalculation.termInYears - crownMoneyLoanCalculation.termInYears).toFixed(2)}</p>
                       </div>
                       <p className="text-xs text-center text-[var(--text-color-muted)] mt-2 italic print:hidden">*Interest Saved is the difference between the total interest paid in the Bank scenario and the Crown Money scenario.</p>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
                           <div>
                               <h4 className="text-center text-[var(--text-color-muted)] mb-2">Payoff Time Comparison (Years)</h4>
                               <div style={{ width: '100%', height: 250 }}>
-                                <ResponsiveContainer>
+                                <ResponsiveContainer minWidth={0} minHeight={0}>
                                     <BarChart data={yearsChartData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)"/>
                                         <XAxis type="category" dataKey="name" hide={true} />
                                         <YAxis stroke="var(--text-color)" domain={[0, 'dataMax + 5']} tickFormatter={(tick) => tick.toFixed(0)} label={{ value: 'Years', angle: -90, position: 'insideLeft', fill: 'var(--text-color-muted)' }} />
-                                        <RechartsTooltip content={<CustomBarTooltip formatter={(value: number) => `${value.toFixed(1)} years`} unit="years" />} cursor={{fill: 'var(--card-bg-color)'}} />
+                                        <RechartsTooltip content={<CustomBarTooltip formatter={(value: number) => `${value.toFixed(2)} years`} unit="years" />} cursor={{fill: 'var(--card-bg-color)'}} />
                                         <Legend verticalAlign="top" wrapperStyle={{color: "var(--text-color-muted)"}} />
                                         <Bar dataKey="Bank" fill="var(--chart-color-bank)" barSize={60} />
                                         <Bar dataKey="Crown Money" fill="var(--chart-color-crown)" barSize={60} />
@@ -709,7 +765,7 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
                           <div>
                               <h4 className="text-center text-[var(--text-color-muted)] mb-2">Total Interest Comparison ($)</h4>
                               <div style={{ width: '100%', height: 250 }}>
-                                <ResponsiveContainer>
+                                <ResponsiveContainer minWidth={0} minHeight={0}>
                                     <BarChart data={interestChartData} margin={{ top: 20, right: 30, left: 10, bottom: 5 }}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)"/>
                                         <XAxis type="category" dataKey="name" hide={true} />
@@ -801,8 +857,8 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
                           </Tooltip>
                         </div>
                           <div className="grid grid-cols-2 gap-4">
-                              <div className="text-center p-3 rounded-lg"><p className="text-xs font-medium text-[var(--chart-color-bank)]">BANK</p><p className="text-3xl font-bold text-[var(--text-color)]">{isBankLoanValid ? bankLoanCalculation.termInYears.toFixed(1) : 'N/A'}</p><p className="text-sm text-[var(--text-color-muted)]">Years</p></div>
-                              <div className="text-center p-3 rounded-lg bg-[var(--chart-color-crown)]/10"><p className="text-xs font-medium text-[var(--chart-color-crown)]">CROWN MONEY 🏆</p><p className="text-3xl font-bold text-[var(--chart-color-crown)]">{isCrownLoanValid ? crownMoneyLoanCalculation.termInYears.toFixed(1) : 'N/A'}</p><p className="text-sm text-[var(--text-color-muted)]">Years</p></div>
+                              <div className="text-center p-3 rounded-lg"><p className="text-xs font-medium text-[var(--chart-color-bank)]">BANK</p><p className="text-3xl font-bold text-[var(--text-color)]">{isBankLoanValid ? bankLoanCalculation.termInYears.toFixed(2) : 'N/A'}</p><p className="text-sm text-[var(--text-color-muted)]">Years</p></div>
+                              <div className="text-center p-3 rounded-lg bg-[var(--chart-color-crown)]/10"><p className="text-xs font-medium text-[var(--chart-color-crown)]">CROWN MONEY 🏆</p><p className="text-3xl font-bold text-[var(--chart-color-crown)]">{isCrownLoanValid ? crownMoneyLoanCalculation.termInYears.toFixed(2) : 'N/A'}</p><p className="text-sm text-[var(--text-color-muted)]">Years</p></div>
                           </div>
                       </div>
                       <hr className="border-[var(--border-color)]" />

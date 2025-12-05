@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { AppState, IncomeItem, ExpenseItem, FutureChange, FutureLumpSum, LoanDetails, LoanSummary } from '../types';
 import Card from './common/Card';
@@ -24,10 +25,7 @@ const FutureChangeImpactDisplay: React.FC<{
     const formatCurrency = (value: number) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
     const formatYears = (value: number) => {
         if (!isFinite(value) || isNaN(value)) return 'N/A';
-        const years = Math.floor(value);
-        const months = Math.round((value - years) * 12);
-        if (years > 0) return `${years}y ${months}m`;
-        return `${months}m`;
+        return `${value.toFixed(2)} years`;
     };
 
     const impact = useMemo(() => {
@@ -388,10 +386,7 @@ const LumpSumImpactDisplay: React.FC<{
     const formatCurrency = (value: number) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
     const formatYears = (value: number) => {
         if (!isFinite(value) || isNaN(value)) return 'N/A';
-        const years = Math.floor(value);
-        const months = Math.round((value - years) * 12);
-        if (years > 0) return `${years}y ${months}m`;
-        return `${months}m`;
+        return `${value.toFixed(2)} years`;
     };
 
     const impact = useMemo(() => {
