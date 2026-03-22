@@ -176,9 +176,3 @@ export interface AppState {
   customSections: CustomSection[];
 }
 
-export interface SavedScenario {
-  id: number;
-  name: string;
-  timestamp: number;
-  data: AppState;
-}

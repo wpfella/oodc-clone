@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { AppState, Tab, ExpenseItem, SavedScenario, CustomSection } from './types';
+import { AppState, Tab, ExpenseItem, CustomSection } from './types';
 import Tab1_CurrentLoan from './components/Tab1_CurrentLoan';
 import Tab2_InterestBreakdown from './components/Tab2_InterestBreakdown';
 import Tab3_IncomeExpenses from './components/Tab3_IncomeExpenses';
@@ -18,6 +18,7 @@ import Modal from './components/common/Modal';
 import AdvancedCalculator from './components/common/AdvancedCalculator';
 import LoginScreen from './components/LoginScreen';
 import Sidebar from './components/Sidebar';
+import { storageService, Scenario } from './services/storageService';
 import { auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import Notepad from './components/Notepad';
@@ -355,11 +356,10 @@ const App: React.FC = () => {
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
   const [scenarioNameInput, setScenarioNameInput] = useState('');
-  const [savedScenarios, setSavedScenarios] = useState<SavedScenario[]>([]);
+  const [savedScenarios, setSavedScenarios] = useState<Scenario[]>([]);
   const [isNotepadOpen, setIsNotepadOpen] = useState(false);
   const importFileInputRef = useRef<HTMLInputElement>(null);
   
-
   useEffect(() => {
     if (infoToast) {
         const timer = setTimeout(() => setInfoToast(''), 3000);
@@ -429,27 +429,22 @@ const App: React.FC = () => {
       console.error("Failed to save state to localStorage", error);
     }
   }, [appState]);
-  
-  useEffect(() => {
-    try {
-        const scenariosJSON = localStorage.getItem(SCENARIOS_STORAGE_KEY);
-        if (scenariosJSON) {
-            setSavedScenarios(JSON.parse(scenariosJSON));
-        }
-    } catch (error) {
-        setSavedScenarios([]);
-    }
-  }, []);
 
-  const updateSavedScenarios = (newScenarios: SavedScenario[]) => {
-    newScenarios.sort((a, b) => b.timestamp - a.timestamp);
-    setSavedScenarios(newScenarios);
-    try {
-        localStorage.setItem(SCENARIOS_STORAGE_KEY, JSON.stringify(newScenarios));
-    } catch (error) {
-        console.error("Failed to save scenarios to localStorage", error);
-    }
-  };
+  // Load and sync scenarios using storageService
+  useEffect(() => {
+    const loadInitial = async () => {
+      const s = await storageService.getScenarios();
+      setSavedScenarios(s.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()));
+    };
+    loadInitial();
+
+    // Subscribe to scenarios for real-time updates
+    const unsubscribe = storageService.subscribeToScenarios((scenarios) => {
+      setSavedScenarios(scenarios.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()));
+    });
+
+    return () => unsubscribe();
+  }, [isAuthenticated]);
 
   const debouncedAppState = useDebounce(appState, 500);
   const calculations = useMortgageCalculations(debouncedAppState);
@@ -548,18 +543,31 @@ const App: React.FC = () => {
     setIsSaveModalOpen(true);
   };
 
-  const handleSaveScenario = () => {
+  const handleSaveScenario = async () => {
       if (!scenarioNameInput.trim()) {
           alert("Please enter a name for the scenario.");
           return;
       }
-      const newScenario: SavedScenario = { id: Date.now(), name: scenarioNameInput.trim(), timestamp: Date.now(), data: appState };
-      updateSavedScenarios([...savedScenarios, newScenario]);
+      
+      const now = new Date().toISOString();
+      const newScenario: Scenario = {
+        id: crypto.randomUUID(),
+        name: scenarioNameInput.trim(),
+        data: appState,
+        tags: [],
+        folderId: null,
+        isDeleted: false,
+        createdAt: now,
+        updatedAt: now,
+        isFavorite: false
+      };
+
+      await storageService.saveScenario(newScenario);
+      setInfoToast(isAuthenticated ? 'Scenario saved to cloud!' : 'Scenario saved locally!');
       setIsSaveModalOpen(false);
-      setInfoToast('Scenario saved successfully!');
   };
 
-  const handleLoadScenario = (id: number) => {
+  const handleLoadScenario = (id: string) => {
       const scenarioToLoad = savedScenarios.find(s => s.id === id);
       if (scenarioToLoad) {
           setAppState(scenarioToLoad.data);
@@ -568,16 +576,15 @@ const App: React.FC = () => {
       }
   };
 
-  const handleDeleteScenario = (id: number) => {
+  const handleDeleteScenario = async (id: string) => {
       const scenarioToDelete = savedScenarios.find(s => s.id === id);
       if (scenarioToDelete && window.confirm(`Are you sure you want to delete the scenario "${scenarioToDelete.name}"?`)) {
-          const newScenarios = savedScenarios.filter(s => s.id !== id);
-          updateSavedScenarios(newScenarios);
-          setInfoToast('Scenario deleted.');
+          await storageService.deleteScenario(id);
+          setInfoToast('Scenario moved to trash.');
       }
   };
 
-  const handleExportScenario = (id: number) => {
+  const handleExportScenario = (id: string) => {
       const scenarioToExport = savedScenarios.find(s => s.id === id);
       if (!scenarioToExport) return;
       const jsonContent = JSON.stringify(scenarioToExport.data, null, 2);
@@ -600,7 +607,7 @@ const App: React.FC = () => {
       const file = event.target.files?.[0];
       if (!file) return;
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
           try {
               const text = e.target?.result;
               if (typeof text !== 'string') throw new Error("File is not readable text.");
@@ -608,9 +615,20 @@ const App: React.FC = () => {
               if (!importedData.loan || !importedData.people || !importedData.expenses) throw new Error("Invalid scenario file format.");
               const scenarioName = prompt("Please enter a name for the imported scenario:", file.name.replace('.json', ''));
               if (scenarioName) {
-                  const newScenario: SavedScenario = { id: Date.now(), name: scenarioName, timestamp: Date.now(), data: { ...initialAppState, ...importedData } };
-                  updateSavedScenarios([...savedScenarios, newScenario]);
-                  setInfoToast(`Scenario "${scenarioName}" imported successfully!`);
+                  const now = new Date().toISOString();
+                  const newScenario: Scenario = {
+                    id: crypto.randomUUID(),
+                    name: scenarioName,
+                    data: { ...initialAppState, ...importedData },
+                    tags: [],
+                    folderId: null,
+                    isDeleted: false,
+                    createdAt: now,
+                    updatedAt: now,
+                    isFavorite: false
+                  };
+                  await storageService.saveScenario(newScenario);
+                  setInfoToast(`Scenario "${scenarioName}" imported!`);
               }
           } catch (error) {
               console.error("Failed to import scenario:", error);
@@ -797,7 +815,7 @@ const App: React.FC = () => {
                           <li key={scenario.id} className="p-3 bg-black/10 dark:bg-white/5 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                               <div className="flex-grow">
                                   <p className="font-semibold text-[var(--text-color)]">{scenario.name}</p>
-                                  <p className="text-xs text-[var(--text-color-muted)]">Last modified: {new Date(scenario.timestamp).toLocaleString()}</p>
+                                  <p className="text-xs text-[var(--text-color-muted)]">Last modified: {new Date(scenario.updatedAt).toLocaleString()}</p>
                               </div>
                               <div className="flex-shrink-0 flex items-center gap-2 flex-wrap">
                                   <button onClick={() => handleLoadScenario(scenario.id)} className="px-3 py-1 text-sm bg-[var(--button-bg-color)] text-white rounded-md font-semibold hover:bg-[var(--button-bg-hover-color)] transition-colors">Load</button>

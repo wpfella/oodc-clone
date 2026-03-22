@@ -3,7 +3,12 @@ import React from 'react';
 import { Calculator, Trash2, Camera, Undo2, Save, FolderOpen, Upload, Clipboard, Download, Sparkles, X, Layers, Users, Banknote, BarChart, Info, Percent, Send, User } from 'lucide-react';
 
 export const CrownLogo = ({ className }: { className?: string }) => (
-  <div className={className} style={{ fontWeight: 'bold', fontSize: '24px', color: '#5B21B6' }}>CROWN MONEY</div>
+  <img 
+    src="https://storage.googleapis.com/crown_money/Logo%20%26%20Icon/header-logo.svg" 
+    alt="Crown Money" 
+    className={className} 
+    referrerPolicy="no-referrer"
+  />
 );
 
 export const CalculatorIcon = ({ className }: { className?: string }) => <Calculator className={className} />;

@@ -54,14 +54,14 @@ class StorageService {
     });
   }
 
-  private isGoogleUser() {
-    return auth.currentUser?.email?.endsWith('@crown.money') ?? false;
+  private isLoggedIn() {
+    return auth.currentUser !== null;
   }
 
   // --- Scenarios ---
 
   async saveScenario(scenario: Scenario) {
-    if (this.isGoogleUser()) {
+    if (this.isLoggedIn()) {
       const path = `users/${auth.currentUser!.uid}/scenarios`;
       try {
         await setDoc(doc(db, path, scenario.id), {
@@ -82,7 +82,7 @@ class StorageService {
   }
 
   async getScenarios(): Promise<Scenario[]> {
-    if (this.isGoogleUser()) {
+    if (this.isLoggedIn()) {
       const path = `users/${auth.currentUser!.uid}/scenarios`;
       try {
         const q = query(collection(db, path));
@@ -99,7 +99,7 @@ class StorageService {
   }
 
   async deleteScenario(id: string, permanent = false) {
-    if (this.isGoogleUser()) {
+    if (this.isLoggedIn()) {
       const path = `users/${auth.currentUser!.uid}/scenarios`;
       try {
         if (permanent) {
@@ -129,7 +129,7 @@ class StorageService {
   }
 
   async restoreScenario(id: string) {
-    if (this.isGoogleUser()) {
+    if (this.isLoggedIn()) {
       const path = `users/${auth.currentUser!.uid}/scenarios`;
       try {
         await updateDoc(doc(db, path, id), {
@@ -153,7 +153,7 @@ class StorageService {
   // --- Folders ---
 
   async saveFolder(folder: Folder) {
-    if (this.isGoogleUser()) {
+    if (this.isLoggedIn()) {
       const path = `users/${auth.currentUser!.uid}/folders`;
       try {
         await setDoc(doc(db, path, folder.id), {
@@ -170,7 +170,7 @@ class StorageService {
   }
 
   async getFolders(): Promise<Folder[]> {
-    if (this.isGoogleUser()) {
+    if (this.isLoggedIn()) {
       const path = `users/${auth.currentUser!.uid}/folders`;
       try {
         const snapshot = await getDocs(collection(db, path));
@@ -186,7 +186,7 @@ class StorageService {
   }
 
   async deleteFolder(id: string) {
-    if (this.isGoogleUser()) {
+    if (this.isLoggedIn()) {
       const path = `users/${auth.currentUser!.uid}/folders`;
       try {
         await deleteDoc(doc(db, path, id));
@@ -202,7 +202,7 @@ class StorageService {
   // --- Real-time Sync ---
 
   subscribeToScenarios(callback: (scenarios: Scenario[]) => void) {
-    if (this.isGoogleUser()) {
+    if (this.isLoggedIn()) {
       const path = `users/${auth.currentUser!.uid}/scenarios`;
       return onSnapshot(collection(db, path), (snapshot) => {
         callback(snapshot.docs.map(doc => doc.data() as Scenario));
@@ -214,7 +214,7 @@ class StorageService {
   }
 
   subscribeToFolders(callback: (folders: Folder[]) => void) {
-    if (this.isGoogleUser()) {
+    if (this.isLoggedIn()) {
       const path = `users/${auth.currentUser!.uid}/folders`;
       return onSnapshot(collection(db, path), (snapshot) => {
         callback(snapshot.docs.map(doc => doc.data() as Folder));

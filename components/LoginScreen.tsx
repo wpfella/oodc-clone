@@ -128,10 +128,10 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess, correctPassword }) => {
       >
         <div className="flex flex-col items-center mb-10">
           <motion.div 
-            whileHover={{ scale: 1.05, rotate: 5 }}
-            className="w-24 h-24 bg-[#5B21B6] rounded-3xl flex items-center justify-center mb-6 shadow-2xl shadow-[#5B21B6]/30"
+            whileHover={{ scale: 1.05 }}
+            className="mb-8"
           >
-            <CrownLogo className="h-14 w-14 text-white" />
+            <CrownLogo className="h-20 w-auto" />
           </motion.div>
           <h1 className="text-3xl font-black text-[#250B40] tracking-tight text-center">Out of Debt</h1>
           <p className="text-[#583d77] text-sm mt-3 font-bold uppercase tracking-[0.2em] opacity-60">
