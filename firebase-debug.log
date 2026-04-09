@@ -1,0 +1,28 @@
+[debug] [2026-04-09T03:20:51.526Z] ----------------------------------------------------------------------
+[debug] [2026-04-09T03:20:51.527Z] Command:       /Users/chetanmashru/.nvm/versions/node/v25.8.0/bin/node /Users/chetanmashru/.nvm/versions/node/v25.8.0/bin/firebase projects:create oodc-production-2026-c
+[debug] [2026-04-09T03:20:51.527Z] CLI Version:   15.10.1
+[debug] [2026-04-09T03:20:51.528Z] Platform:      darwin
+[debug] [2026-04-09T03:20:51.528Z] Node Version:  v25.8.0
+[debug] [2026-04-09T03:20:51.528Z] Time:          Thu Apr 09 2026 13:20:51 GMT+1000 (Australian Eastern Standard Time)
+[debug] [2026-04-09T03:20:51.528Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-04-09T03:20:51.531Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-04-09T03:20:51.531Z] > authorizing via signed-in user (chetanmashru@gmail.com)
+[debug] [2026-04-09T03:21:02.575Z] Checked if tokens are valid: true, expires at: 1775708179939
+[debug] [2026-04-09T03:21:02.575Z] Checked if tokens are valid: true, expires at: 1775708179939
+[debug] [2026-04-09T03:21:02.576Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects [none]
+[debug] [2026-04-09T03:21:02.576Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects {"projectId":"oodc-production-2026-c","name":"oodc-production-2026-c"}
+[debug] [2026-04-09T03:21:03.779Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects 200
+[debug] [2026-04-09T03:21:03.780Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects {"name":"operations/create_project.global.8403531773825452186"}
+[debug] [2026-04-09T03:21:03.780Z] Checked if tokens are valid: true, expires at: 1775708179939
+[debug] [2026-04-09T03:21:03.781Z] Checked if tokens are valid: true, expires at: 1775708179939
+[debug] [2026-04-09T03:21:03.781Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/operations/create_project.global.8403531773825452186 [none]
+[debug] [2026-04-09T03:21:04.703Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/operations/create_project.global.8403531773825452186 200
+[debug] [2026-04-09T03:21:04.703Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/operations/create_project.global.8403531773825452186 {"name":"operations/create_project.global.8403531773825452186","metadata":{"@type":"type.googleapis.com/google.cloudresourcemanager.v1.ProjectCreationStatus","ready":true},"done":true,"error":{"code":8,"message":"The project cannot be created because you have exceeded your allotted project quota.","details":[{"@type":"type.googleapis.com/google.rpc.QuotaFailure","violations":[{"description":"The project cannot be created because you have exceeded your allotted project quota."}]}]}}
+[debug] [2026-04-09T03:21:04.965Z] FirebaseError: The project cannot be created because you have exceeded your allotted project quota.
+    at OperationPoller.poll (/Users/chetanmashru/.nvm/versions/node/v25.8.0/lib/node_modules/firebase-tools/lib/operation-poller.js:25:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async createCloudProject (/Users/chetanmashru/.nvm/versions/node/v25.8.0/lib/node_modules/firebase-tools/lib/management/projects.js:237:29)
+    at async createFirebaseProjectAndLog (/Users/chetanmashru/.nvm/versions/node/v25.8.0/lib/node_modules/firebase-tools/lib/management/projects.js:102:9)
+[error] 
+[error] Error: Failed to create project. See firebase-debug.log for more info.

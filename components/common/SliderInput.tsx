@@ -51,7 +51,7 @@ const SliderInput: React.FC<SliderInputProps> = ({
           step={step}
           value={value}
           onChange={(e) => onChange(parseFloat(e.target.value))}
-          className="flex-grow h-2 bg-[var(--input-bg-color)] rounded-lg appearance-none cursor-pointer accent-[var(--title-color)]"
+          className="flex-grow h-2 bg-[var(--slider-track-color)] rounded-lg appearance-none cursor-pointer accent-[var(--title-color)]"
         />
       </div>
       <div className="flex justify-between text-[10px] text-[var(--text-color-muted)] uppercase tracking-wider">

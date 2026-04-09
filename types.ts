@@ -72,6 +72,7 @@ export interface FutureLumpSum {
   id: number;
   amount: number;
   date: string;
+  description?: string;
   type: 'income' | 'expense';
   name?: string;
   year?: number;
@@ -86,21 +87,26 @@ export interface InvestmentPropertyExpense {
 
 export interface InvestmentProperty {
   id: number;
-  name: string;
-  value: number;
+  name?: string;
+  value?: number;
   propertyValue?: number;
   loanAmount: number;
   interestRate: number;
-  rent: number;
+  rent?: number;
   rentalIncome: number;
   rentalIncomeFrequency: Frequency;
   expenses: InvestmentPropertyExpense[];
-  growthRate: number;
+  growthRate?: number;
   rentalGrowthRate?: number;
   address?: string;
+  purchaseDate?: string;
   isFuture?: boolean;
   crownSettings?: {
-    interestRate: number;
+    interestRate?: number;
+    loanType?: 'P&I' | 'IO';
+    repayment?: number;
+    interestOnlyTerm?: number;
+    repaymentFrequency?: Frequency;
   };
   offsetBalance?: number;
   repayment: number;
@@ -108,6 +114,7 @@ export interface InvestmentProperty {
   loanType?: 'P&I' | 'IO';
   loanTerm?: number;
   interestOnlyTerm?: number;
+  loanStartDate?: string;
 }
 
 export interface LoanDetails {
@@ -172,7 +179,7 @@ export interface AppState {
   marginalTaxRate: number;
   debtRecyclingPercentage: number;
   notepadContent: string;
-  investmentCashflowScenario: string;
+  investmentCashflowScenario: 'bank' | 'crown' | string;
   customSections: CustomSection[];
 }
 
