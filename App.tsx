@@ -448,13 +448,14 @@ const App: React.FC = () => {
     }
   }, [appState]);
 
+  const refreshScenarios = async () => {
+    const s = await storageService.getScenarios();
+    setSavedScenarios(s.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()));
+  };
+
   // Load and sync scenarios using storageService
   useEffect(() => {
-    const loadInitial = async () => {
-      const s = await storageService.getScenarios();
-      setSavedScenarios(s.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()));
-    };
-    loadInitial();
+    refreshScenarios();
 
     // Subscribe to scenarios for real-time updates
     const unsubscribe = storageService.subscribeToScenarios((scenarios) => {
@@ -581,6 +582,7 @@ const App: React.FC = () => {
       };
 
       await storageService.saveScenario(newScenario);
+      await refreshScenarios();
       setInfoToast(isAuthenticated ? 'Scenario saved to cloud!' : 'Scenario saved locally!');
       setIsSaveModalOpen(false);
   };
@@ -598,6 +600,7 @@ const App: React.FC = () => {
       const scenarioToDelete = savedScenarios.find(s => s.id === id);
       if (scenarioToDelete && window.confirm(`Are you sure you want to delete the scenario "${scenarioToDelete.name}"?`)) {
           await storageService.deleteScenario(id);
+          await refreshScenarios();
           setInfoToast('Scenario moved to trash.');
       }
   };
@@ -646,6 +649,7 @@ const App: React.FC = () => {
                     isFavorite: false
                   };
                   await storageService.saveScenario(newScenario);
+                  await refreshScenarios();
                   setAppState(newScenario.data);
                   setIsLoadModalOpen(false);
                   setInfoToast(`Scenario "${scenarioName}" imported and loaded!`);
