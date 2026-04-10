@@ -352,7 +352,7 @@ export const useMortgageCalculations = (appState: AppState) => {
             const crownLoanDetailsForCalc = { amount: (loan.amount + consolidatedAmount), interestRate: crownMoneyInterestRate, repayment: crownSurplus, frequency: 'monthly' as const, offsetBalance: loan.offsetBalance };
             const result = calculateAmortization(crownLoanDetailsForCalc, { futureChanges: allFutureChanges, futureLumpSums, strategy: 'crown' });
             if (result.termInYears === Infinity) throw new Error("Infinite term");
-            return { ...result, amortizationSchedule: result.amortizationSchedule.map(point => ({ ...point, totalRemainingBalance: point.remainingBalance })) };
+            return { ...result, amortizationSchedule: (result.amortizationSchedule || []).map(point => ({ ...point, totalRemainingBalance: point.remainingBalance })) };
         } catch (e) {
             return { termInYears: Infinity, totalInterest: Infinity, totalPaid: Infinity, amortizationSchedule: [] };
         }
@@ -407,7 +407,7 @@ export const useMortgageCalculations = (appState: AppState) => {
                                     totalInterest: interestDuringWait + payoffCalc.totalInterest, 
                                     amortizationSchedule: [
                                         ...waitSchedule,
-                                        ...payoffCalc.amortizationSchedule.map(p => ({...p, month: p.month + cumulativeMonthsOffset, isWaitPhase: false}))
+                                        ...(payoffCalc.amortizationSchedule || []).map(p => ({...p, month: p.month + cumulativeMonthsOffset, isWaitPhase: false}))
                                     ], 
                                     startYear: cumulativeMonthsOffset / 12, 
                                     durationYears: payoffCalc.termInYears,

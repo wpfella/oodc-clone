@@ -320,7 +320,7 @@ const FooterTrustSignals = () => (
         <div className="text-center mb-12">
             <h3 className="text-sm font-black uppercase tracking-[0.3em] text-[var(--text-color-muted)] mb-4">Multi-Award Winning Strategy</h3>
             <div className="flex flex-wrap justify-center items-center gap-6 md:gap-12 px-4">
-                {AWARDS.map((src, idx) => (
+                {(AWARDS || []).map((src, idx) => (
                     <img key={idx} src={src} alt="Crown Money Award" className="h-20 w-auto object-contain opacity-90 hover:opacity-100 transition-opacity drop-shadow-sm" />
                 ))}
             </div>
@@ -329,7 +329,7 @@ const FooterTrustSignals = () => (
         <div className="bg-white/50 backdrop-blur-sm py-12 rounded-3xl border border-[var(--border-color)] shadow-sm overflow-hidden">
             <h3 className="text-sm font-black uppercase tracking-[0.3em] text-center text-[var(--text-color-muted)] mb-8">As Featured In</h3>
             <div className="flex flex-wrap justify-center items-center gap-8 md:gap-x-16 md:gap-y-12 px-8 max-w-6xl mx-auto">
-                {MEDIA_LOGOS.map((src, idx) => (
+                {(MEDIA_LOGOS || []).map((src, idx) => (
                     <img key={idx} src={src} alt="Media Feature" className="trust-logo h-8 md:h-10 w-auto object-contain" />
                 ))}
             </div>
@@ -588,7 +588,7 @@ const App: React.FC = () => {
   const handleLoadScenario = (id: string) => {
       const scenarioToLoad = savedScenarios.find(s => s.id === id);
       if (scenarioToLoad) {
-          setAppState(scenarioToLoad.data);
+          setAppState(sanitizeAppState(scenarioToLoad.data));
           setIsLoadModalOpen(false);
           setInfoToast(`Scenario "${scenarioToLoad.name}" loaded.`);
       }
@@ -727,7 +727,7 @@ const App: React.FC = () => {
           <nav className="app-nav mb-6 print:hidden">
             <div className="border-b border-[var(--border-color)]">
               <div className="-mb-px flex flex-wrap space-x-2 sm:space-x-4 justify-center" aria-label="Tabs">
-                {tabs.map((tab) => (
+                {(tabs || []).map((tab) => (
                   <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`${activeTab === tab.id ? 'border-[var(--title-color)] text-[var(--title-color)]' : 'border-transparent text-[var(--text-color-muted)] hover:border-gray-400 hover:text-[var(--text-color)]'} whitespace-nowrap border-b-2 py-3 px-1 text-sm sm:text-base font-medium transition-colors focus:outline-none`} aria-current={activeTab === tab.id ? 'page' : undefined}>{tab.label}</button>
                 ))}
               </div>
@@ -735,7 +735,7 @@ const App: React.FC = () => {
           </nav>
           
           <div className="app-main mt-4">
-             {tabs.map(tab => ( 
+             {(tabs || []).map(tab => ( 
                 <div key={tab.id} className={`${activeTab === tab.id ? 'active-tab-content' : 'hidden'} ${tab.id === Tab.Reports ? 'printable' : ''}`}>
                     {tab.component}
                     
@@ -831,7 +831,7 @@ const App: React.FC = () => {
           <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
               {savedScenarios.length === 0 ? ( <p className="text-center text-sm text-[var(--text-color-muted)] py-8">No saved scenarios yet. Use the "Save" button to create one.</p> ) : (
                   <ul className="space-y-3">
-                      {savedScenarios.map(scenario => (
+                      {(savedScenarios || []).map(scenario => (
                           <li key={scenario.id} className="p-3 bg-black/10 dark:bg-white/5 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                               <div className="flex-grow">
                                   <p className="font-semibold text-[var(--text-color)]">{scenario.name}</p>

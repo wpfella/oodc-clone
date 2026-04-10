@@ -33,7 +33,7 @@ const CustomAreaTooltip: React.FC<{ active?: boolean, payload?: any[], label?: s
         return (
             <div className="p-3 bg-[var(--tooltip-bg-color)] border border-[var(--border-color)] rounded-lg text-sm shadow-lg print:hidden space-y-1">
                 <p className="label text-[var(--tooltip-text-color)] font-bold mb-1">{`Age: ${label}`}</p>
-                {payload.map((pld: any) => (
+                {(payload || []).map((pld: any) => (
                     <div key={pld.dataKey} className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: pld.stroke || pld.fill }}></div>
                         <p className="text-[var(--tooltip-text-color)]">
@@ -288,7 +288,7 @@ const Tab_In2Wealth: React.FC<Props> = ({ appState, setAppState, calculations })
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <h2 className="text-lg font-bold text-[var(--title-color)]">Step 2: Your Wealth Projections</h2>
             <div className="flex gap-2 text-xs font-semibold p-1 bg-[var(--input-bg-color)] rounded-lg border border-[var(--border-color)]">
-                {people.map(p => (
+                {(people || []).map(p => (
                     <button 
                         key={p.id}
                         onClick={() => setSelectedPersonId(p.id)}

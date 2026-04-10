@@ -153,7 +153,7 @@ const Tab5_Summary: React.FC<Props> = ({ appState, setAppState, calculations, on
         <div className="space-y-6">
             <Card title="Client & Loan Overview">
                 <h4 className="font-semibold text-sm mb-2 text-[var(--text-color)] print:text-black">Borrowers</h4>
-                {people.map(p => <SummaryItem key={p.id} label={p.name} value={`Age ${p.age}`} />)}
+                {(people || []).map(p => <SummaryItem key={p.id} label={p.name} value={`Age ${p.age}`} />)}
                 
                 <h4 className="font-semibold text-sm mt-4 mb-2 text-[var(--text-color)] print:text-black">Contact & Meeting Details</h4>
                 <div className="space-y-4 py-2">
@@ -218,7 +218,7 @@ const Tab5_Summary: React.FC<Props> = ({ appState, setAppState, calculations, on
                 {otherDebts.length > 0 && (
                   <div className="mt-4 pt-4 border-t border-dashed border-[var(--border-color)]">
                     <h4 className="font-semibold text-sm mb-2 text-[var(--text-color)] print:text-black">Consolidated Debts</h4>
-                    {otherDebts.map(d => (
+                    {(otherDebts || []).map(d => (
                         <SummaryItem key={d.id} label={d.name} value={formatCurrency(d.amount)} />
                     ))}
                     <SummaryItem label="Total Consolidated Principal" value={formatCurrency(otherDebts.reduce((s,d) => s + d.amount, 0))} valueClassName="font-bold text-[var(--title-color)]" />
@@ -240,7 +240,7 @@ const Tab5_Summary: React.FC<Props> = ({ appState, setAppState, calculations, on
                   {futureChanges.length > 0 && (
                       <>
                           <h4 className="font-semibold text-sm mb-2 text-[var(--text-color)] print:text-black">Scheduled Changes</h4>
-                          {futureChanges.map(change => (
+                          {(futureChanges || []).map(change => (
                               <SummaryItem 
                                   key={change.id} 
                                   label={`${change.description} (${change.type})`}
@@ -253,7 +253,7 @@ const Tab5_Summary: React.FC<Props> = ({ appState, setAppState, calculations, on
                   {futureLumpSums.length > 0 && (
                       <>
                           <h4 className="font-semibold text-sm mt-4 mb-2 text-[var(--text-color)] print:text-black">Lump Sum Events</h4>
-                          {futureLumpSums.map(lump => (
+                          {(futureLumpSums || []).map(lump => (
                               <SummaryItem 
                                   key={lump.id} 
                                   label={`${lump.description} (${lump.type})`}
@@ -268,7 +268,7 @@ const Tab5_Summary: React.FC<Props> = ({ appState, setAppState, calculations, on
 
             {hasInvestments && (
               <Card title="Investment Portfolio Details">
-                  {investmentProperties.map(prop => {
+                  {(investmentProperties || []).map(prop => {
                       const propCashflow = calculatePropertyCashflow(prop);
                       return (
                           <div key={prop.id} className="mb-4 pb-4 border-b border-[var(--border-color)] print:border-gray-200 last:border-b-0 last:pb-0 last:mb-0">
@@ -380,7 +380,7 @@ const Tab5_Summary: React.FC<Props> = ({ appState, setAppState, calculations, on
                     <div>{formatYears(bankLoanCalculation.termInYears)}</div>
                     <div>Total Interest</div>
                     <div>{formatCurrency(bankLoanCalculation.totalInterest + otherDebtsStatusQuoInterest)}</div>
-                    {people.map(p => <React.Fragment key={p.id}><div>{p.name} Debt Free</div><div>Age {isBankLoanValid ? Math.ceil(p.age + bankLoanCalculation.termInYears) : 'N/A'}</div></React.Fragment>)}
+                    {(people || []).map(p => <React.Fragment key={p.id}><div>{p.name} Debt Free</div><div>Age {isBankLoanValid ? Math.ceil(p.age + bankLoanCalculation.termInYears) : 'N/A'}</div></React.Fragment>)}
                 </div>
             </div>
              <div>
@@ -393,7 +393,7 @@ const Tab5_Summary: React.FC<Props> = ({ appState, setAppState, calculations, on
                     <div className="font-bold text-[var(--chart-color-crown)]">{formatYears(crownMoneyLoanCalculation.termInYears)}</div>
                     <div>Total Interest</div>
                     <div className="font-bold text-[var(--chart-color-crown)]">{formatCurrency(crownMoneyLoanCalculation.totalInterest)}</div>
-                    {people.map(p => <React.Fragment key={p.id}><div>{p.name} Debt Free</div><div className="font-bold text-[var(--chart-color-crown)]">Age {isCrownLoanValid ? Math.ceil(p.age + crownMoneyLoanCalculation.termInYears) : 'N/A'}</div></React.Fragment>)}
+                    {(people || []).map(p => <React.Fragment key={p.id}><div>{p.name} Debt Free</div><div className="font-bold text-[var(--chart-color-crown)]">Age {isCrownLoanValid ? Math.ceil(p.age + crownMoneyLoanCalculation.termInYears) : 'N/A'}</div></React.Fragment>)}
                 </div>
             </div>
         </div>
@@ -431,11 +431,11 @@ const Tab5_Summary: React.FC<Props> = ({ appState, setAppState, calculations, on
           <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-x-8">
               <div>
                   <h4 className="font-semibold text-sm mb-2 text-[var(--text-color)] print:text-black">Incomes</h4>
-                  {incomes.map(i => <SummaryItem key={i.id} label={i.name} value={`${formatCurrency(i.amount)} / ${i.frequency}`} />)}
+                  {(incomes || []).map(i => <SummaryItem key={i.id} label={i.name} value={`${formatCurrency(i.amount)} / ${i.frequency}`} />)}
               </div>
               <div>
                   <h4 className="font-semibold text-sm mb-2 text-[var(--text-color)] print:text-black">Expenses</h4>
-                  {expenses.map(e => <SummaryItem key={e.id} label={e.name} value={`${formatCurrency(e.amount)} / ${e.frequency}`} />)}
+                  {(expenses || []).map(e => <SummaryItem key={e.id} label={e.name} value={`${formatCurrency(e.amount)} / ${e.frequency}`} />)}
               </div>
           </div>
       </Card>

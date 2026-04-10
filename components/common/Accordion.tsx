@@ -26,7 +26,7 @@ const Accordion: React.FC<AccordionProps> = ({ items, defaultOpenIndex = 0 }) =>
 
   return (
     <div className="space-y-2">
-      {items.map((item, index) => (
+      {(items || []).map((item, index) => (
         <div key={index} className="border border-[var(--border-color)] bg-[var(--card-bg-color)] rounded-lg overflow-hidden">
           <button
             onClick={() => toggleItem(index)}

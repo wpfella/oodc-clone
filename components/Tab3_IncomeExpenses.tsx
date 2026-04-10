@@ -912,7 +912,7 @@ const Tab3_IncomeExpenses: React.FC<Props> = ({ appState, setAppState, calculati
                 )}
                 <div>
                     <div className="text-xs text-[var(--text-color-muted)] mt-1 pr-2 space-y-2 border-l-2 border-[var(--border-color)] pl-2 ml-auto w-fit text-right">
-                        {expenseCategories.map(category => {
+                        {(expenseCategories || []).map(category => {
                             const categoryExpenses = expenses.filter(exp => exp.category === category);
                             if (categoryExpenses.length === 0) return null;
 
@@ -922,7 +922,7 @@ const Tab3_IncomeExpenses: React.FC<Props> = ({ appState, setAppState, calculati
                             return (
                                 <div key={category} className="pl-2 pb-2">
                                     <h5 className="font-semibold text-[var(--text-color)] text-left mb-1 capitalize">{category.replace(' Expenses', '')}</h5>
-                                    {categoryExpenses.map(exp => {
+                                    {(categoryExpenses || []).map(exp => {
                                         const monthlyAmount = getMonthlyAmount(exp.amount, exp.frequency);
                                         return (
                                             <div key={exp.id} className="flex justify-between gap-4 italic items-center">

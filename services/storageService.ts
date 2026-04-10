@@ -87,7 +87,7 @@ class StorageService {
       try {
         const q = query(collection(db, path));
         const snapshot = await getDocs(q);
-        return snapshot.docs.map(doc => doc.data() as Scenario);
+        return (snapshot.docs || []).map(doc => doc.data() as Scenario);
       } catch (error) {
         handleFirestoreError(error, OperationType.GET, path);
         return [];
@@ -174,7 +174,7 @@ class StorageService {
       const path = `users/${auth.currentUser!.uid}/folders`;
       try {
         const snapshot = await getDocs(collection(db, path));
-        return snapshot.docs.map(doc => doc.data() as Folder);
+        return (snapshot.docs || []).map(doc => doc.data() as Folder);
       } catch (error) {
         handleFirestoreError(error, OperationType.GET, path);
         return [];
@@ -205,7 +205,7 @@ class StorageService {
     if (this.isLoggedIn()) {
       const path = `users/${auth.currentUser!.uid}/scenarios`;
       return onSnapshot(collection(db, path), (snapshot) => {
-        callback(snapshot.docs.map(doc => doc.data() as Scenario));
+        callback((snapshot.docs || []).map(doc => doc.data() as Scenario));
       }, (error) => {
         handleFirestoreError(error, OperationType.GET, path);
       });
@@ -217,7 +217,7 @@ class StorageService {
     if (this.isLoggedIn()) {
       const path = `users/${auth.currentUser!.uid}/folders`;
       return onSnapshot(collection(db, path), (snapshot) => {
-        callback(snapshot.docs.map(doc => doc.data() as Folder));
+        callback((snapshot.docs || []).map(doc => doc.data() as Folder));
       }, (error) => {
         handleFirestoreError(error, OperationType.GET, path);
       });

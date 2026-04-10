@@ -124,7 +124,7 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
       crownSurplus
     } = calculations;
   
-  const youngestPersonAge = Math.min(...people.map((p: any) => p.age));
+  const youngestPersonAge = Math.min(...(people || []).map((p: any) => p.age));
 
   // Optimized local simulation for "What If" scenario
   const crownMoneyLoanCalculation = useMemo(() => {
@@ -156,7 +156,7 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
 
     return { 
         ...result, 
-        amortizationSchedule: result.amortizationSchedule.map(point => ({ 
+        amortizationSchedule: (result.amortizationSchedule || []).map(point => ({ 
             ...point, 
             totalRemainingBalance: point.remainingBalance 
         })) 
@@ -430,7 +430,7 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
                                         <Tooltip content={
                                             <div className="space-y-3 min-w-[300px]">
                                                 <p className="font-bold border-b border-white/20 pb-1">Debt Consolidation Breakdown</p>
-                                                {otherDebtsCalculations.map((c: any) => (
+                                                {(otherDebtsCalculations || []).map((c: any) => (
                                                     <div key={c.debt.id} className="space-y-1 text-xs">
                                                         <p className="font-semibold text-emerald-300">{c.debt.name}</p>
                                                         <div className="grid grid-cols-2 gap-x-4 opacity-90">
@@ -561,7 +561,7 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
                                 <td className="py-4 text-right font-black text-[var(--title-color)]">{crownMoneyLoanCalculation.termInYears.toFixed(1)}</td>
                             </tr>
                             {/* Ages at Debt Free */}
-                            {people.map((p, idx) => (
+                            {(people || []).map((p, idx) => (
                                 <tr key={p.id}>
                                     <td className="py-4 font-bold text-[var(--text-color)]">{p.name || `Person ${idx + 1}`} Debt Free Age</td>
                                     <td className="py-4 text-right pr-8 text-[var(--text-color)]">{isBankLoanValid ? Math.ceil(p.age + bankLoanCalculation.termInYears) : 'N/A'}</td>

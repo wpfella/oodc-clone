@@ -49,7 +49,7 @@ const CrownRoadmap: React.FC<{ properties: any[] }> = ({ properties }) => {
                 <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-slate-100 -translate-x-1/2 rounded-full hidden md:block"></div>
                 
                 <div className="space-y-24 relative">
-                    {properties.map((prop, idx) => {
+                    {(properties || []).map((prop, idx) => {
                         const isEven = idx % 2 === 0;
                         const crownYear = prop.endYear;
                         const bankYear = prop.bankYears;
@@ -442,7 +442,7 @@ const Tab_InvestmentOODC: React.FC<Props> = ({ appState, setAppState, calculatio
                 >
                     Full Portfolio 🏔️
                 </button>
-                {individualPropertyData.map(asset => (
+                {(individualPropertyData || []).map(asset => (
                     <button 
                         key={asset.id}
                         onClick={() => setSelectedAssetId(asset.id)}
@@ -564,7 +564,7 @@ const Tab_InvestmentOODC: React.FC<Props> = ({ appState, setAppState, calculatio
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {individualPropertyData.map((prop, idx) => (
+                {(individualPropertyData || []).map((prop, idx) => (
                   <tr key={idx} className="group hover:bg-slate-50 transition-colors">
                     <td className="py-5 flex items-center gap-3">
                       <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: prop.phaseColor }}></div>
@@ -577,7 +577,7 @@ const Tab_InvestmentOODC: React.FC<Props> = ({ appState, setAppState, calculatio
                 ))}
                 <tr className="bg-emerald-50 border-t-2 border-emerald-200">
                   <td className="py-6 pl-4 font-black text-lg uppercase tracking-tight text-emerald-900">Portfolio Total</td>
-                  <td className="py-6 text-center font-bold text-slate-700">{getExactDate(Math.max(...individualPropertyData.map(p => p.bankYears)))}</td>
+                  <td className="py-6 text-center font-bold text-slate-700">{getExactDate(Math.max(...(individualPropertyData || []).map(p => p.bankYears)))}</td>
                   <td className="py-6 text-center font-black text-xl text-indigo-800">{getExactDate(totalDebtFreeYears)}</td>
                   <td className="py-6 text-right font-black text-2xl text-emerald-800 pr-4">{formatCurrency(totalInterestSaved)}</td>
                 </tr>
@@ -594,7 +594,7 @@ const Tab_InvestmentOODC: React.FC<Props> = ({ appState, setAppState, calculatio
             </div>
 
             <div className="space-y-8">
-                {individualPropertyData.map((prop, idx) => (
+                {(individualPropertyData || []).map((prop, idx) => (
                     <PropertyAttackAnalysisCard 
                         key={idx}
                         title={prop.title}

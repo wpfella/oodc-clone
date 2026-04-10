@@ -376,7 +376,7 @@ const Sidebar: React.FC<SidebarProps> = ({ appState, setAppState, onLoadScenario
                   <div className="space-y-2">
                     <label className="text-xs font-black text-[#250B40] uppercase tracking-widest">Shared with</label>
                     <div className="space-y-2">
-                      {sharingScenario.sharedWith.map(email => (
+                      {(sharingScenario.sharedWith || []).map(email => (
                         <div key={email} className="flex items-center justify-between p-3 bg-[#F8F8F8] rounded-xl border border-[#E6DEEE]">
                           <span className="text-sm font-medium text-[#250B40]">{email}</span>
                           <button 
@@ -513,7 +513,7 @@ const Sidebar: React.FC<SidebarProps> = ({ appState, setAppState, onLoadScenario
               <div className="mt-8">
                 <p className="px-4 text-[10px] font-black text-[#583d77] uppercase tracking-[0.2em] mb-3 opacity-50">Folders</p>
                 <div className="space-y-1">
-                  {folders.map(folder => (
+                  {(folders || []).map(folder => (
                     <div key={folder.id} className="group relative">
                       <button 
                         onClick={() => { setActiveFolderId(folder.id); setShowDeleted(false); }}
@@ -572,7 +572,7 @@ const Sidebar: React.FC<SidebarProps> = ({ appState, setAppState, onLoadScenario
               
               <div className="space-y-3">
                 <AnimatePresence mode="popLayout">
-                  {filteredScenarios.map(scenario => (
+                  {(filteredScenarios || []).map(scenario => (
                     <motion.div 
                       layout
                       initial={{ opacity: 0, y: 10 }}

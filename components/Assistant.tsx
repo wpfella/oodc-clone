@@ -37,7 +37,7 @@ const generateAssistantContext = (appState: AppState, calculations: any, activeT
         initialLVR
     } = calculations;
 
-    const assetBreakdown = investmentLoanCalculations.investmentPayoffSchedule.map((inv: any) => {
+    const assetBreakdown = (investmentLoanCalculations.investmentPayoffSchedule || []).map((inv: any) => {
         const prop = investmentProperties.find(p => p.id === inv.propertyId);
         return {
             address: prop?.address || 'Unknown',
@@ -50,7 +50,7 @@ const generateAssistantContext = (appState: AppState, calculations: any, activeT
 
     const summary = {
         currentTab: activeTab,
-        borrowers: people.map(p => `${p.name} (Age: ${p.age})`),
+        borrowers: (people || []).map(p => `${p.name} (Age: ${p.age})`),
         primaryLoan: {
             amount: formatCurrency(loan.amount),
             interestRate: `${loan.interestRate}%`,
@@ -63,7 +63,7 @@ const generateAssistantContext = (appState: AppState, calculations: any, activeT
             bankYears: bankLoanCalculation.termInYears.toFixed(1),
             crownYears: crownMoneyLoanCalculation.termInYears.toFixed(1)
         },
-        consolidatedDebts: otherDebts.map(d => ({
+        consolidatedDebts: (otherDebts || []).map(d => ({
             name: d.name,
             amount: formatCurrency(d.amount),
             rate: `${d.interestRate}%`,
@@ -174,7 +174,7 @@ User Question: "${userInput}"
                                 <p className="text-[11px] px-8 mt-1">Need help explaining these savings to the client? Just ask.</p>
                             </div>
                         )}
-                        {messages.map((msg, i) => (
+                        {(messages || []).map((msg, i) => (
                             <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                                 <div className={`p-3 rounded-2xl max-w-[90%] shadow-sm ${msg.sender === 'user' ? 'bg-[var(--title-color)] text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100'}`}>
                                     <div className="ai-response-content" dangerouslySetInnerHTML={{ __html: msg.text }} />

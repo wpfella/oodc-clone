@@ -318,7 +318,7 @@ const Tab2_InterestBreakdown: React.FC<Props> = ({ appState, setAppState, calcul
                           );
                       }}
                     >
-                      {firstYearPieData.map((entry, index) => (
+                      {(firstYearPieData || []).map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={firstYearPieColors[index % firstYearPieColors.length]} />
                       ))}
                     </Pie>

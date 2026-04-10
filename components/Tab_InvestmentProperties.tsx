@@ -50,7 +50,7 @@ const InvestmentPropertyCard: React.FC<{
     };
 
     const handleExpenseChange = (expId: number, field: keyof InvestmentPropertyExpense, value: any) => {
-        const newExpenses = property.expenses.map(exp => 
+        const newExpenses = (property.expenses || []).map(exp => 
             exp.id === expId ? { ...exp, [field]: value } : exp
         );
         onUpdate(property.id, 'expenses', newExpenses);
@@ -554,7 +554,7 @@ const InvestmentPropertyCard: React.FC<{
                         </Tooltip>
                     </div>
                     <div className="space-y-2">
-                        {property.expenses.map(exp => (
+                        {(property.expenses || []).map(exp => (
                             <div key={exp.id} className="flex items-center gap-2">
                                 <input type="text" value={exp.name} onChange={e => handleExpenseChange(exp.id, 'name', e.target.value)} className={`flex-grow ${inputClasses}`} placeholder="Expense Name"/>
                                 <div className="relative w-36">
@@ -660,7 +660,7 @@ const Tab_InvestmentProperties: React.FC<Props> = ({ appState, setAppState, calc
     const handlePropertyUpdate = (id: number, field: keyof InvestmentProperty, value: any) => {
         setAppState(prev => ({
             ...prev,
-            investmentProperties: prev.investmentProperties.map(p => 
+            investmentProperties: (prev.investmentProperties || []).map(p => 
                 p.id === id ? { ...p, [field]: value } : p
             )
         }));
@@ -695,7 +695,7 @@ const Tab_InvestmentProperties: React.FC<Props> = ({ appState, setAppState, calc
                 </div>
             </div>
 
-            {appState.investmentProperties.map(prop => (
+            {(appState.investmentProperties || []).map(prop => (
                 <InvestmentPropertyCard
                     key={prop.id}
                     property={prop}

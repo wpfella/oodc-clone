@@ -116,7 +116,7 @@ const AICommandCenter: React.FC<Props> = ({ appState, calculations, isOpen, onCl
                         </div>
 
                         <div className="flex flex-wrap gap-2">
-                            {SAMPLE_PROMPTS.map(sample => (
+                            {(SAMPLE_PROMPTS || []).map(sample => (
                                 <button 
                                     key={sample.label}
                                     onClick={() => setPrompt(sample.prompt)}
