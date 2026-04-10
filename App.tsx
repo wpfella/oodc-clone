@@ -243,6 +243,12 @@ const sanitizeAppState = (state: AppState): AppState => {
     
     if (safeState.loan.repayment < 0) safeState.loan.repayment = 0;
 
+    // Sanitize People
+    safeState.people = (safeState.people || []).map(p => ({
+        ...p,
+        age: ensureFinite(p.age, 30)
+    }));
+
     // Sanitize Incomes
     safeState.incomes = (safeState.incomes || []).map(inc => ({
         ...inc,
@@ -275,6 +281,18 @@ const sanitizeAppState = (state: AppState): AppState => {
             ...exp,
             amount: ensureFinite(exp.amount, 0)
         }))
+    }));
+
+    // Sanitize Future Changes
+    safeState.futureChanges = (safeState.futureChanges || []).map(change => ({
+        ...change,
+        changeAmount: ensureFinite(change.changeAmount, 0)
+    }));
+
+    // Sanitize Future Lump Sums
+    safeState.futureLumpSums = (safeState.futureLumpSums || []).map(lumpSum => ({
+        ...lumpSum,
+        amount: ensureFinite(lumpSum.amount, 0)
     }));
 
     // Other Global Values
