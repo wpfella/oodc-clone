@@ -619,7 +619,7 @@ const App: React.FC = () => {
                   const newScenario: Scenario = {
                     id: crypto.randomUUID(),
                     name: scenarioName,
-                    data: { ...initialAppState, ...importedData },
+                    data: sanitizeAppState({ ...initialAppState, ...importedData }),
                     tags: [],
                     folderId: null,
                     isDeleted: false,
