@@ -628,7 +628,9 @@ const App: React.FC = () => {
                     isFavorite: false
                   };
                   await storageService.saveScenario(newScenario);
-                  setInfoToast(`Scenario "${scenarioName}" imported!`);
+                  setAppState(newScenario.data);
+                  setIsLoadModalOpen(false);
+                  setInfoToast(`Scenario "${scenarioName}" imported and loaded!`);
               }
           } catch (error) {
               console.error("Failed to import scenario:", error);

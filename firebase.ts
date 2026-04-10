@@ -28,10 +28,7 @@ export {
   signInWithPopup
 };
 
-// Restrict Google Login to @crown.money domain
-googleProvider.setCustomParameters({
-  hd: 'crown.money'
-});
+// Removed hardcoded Google domain restriction to allow multiple domains.
 
 export enum OperationType {
   CREATE = 'create',

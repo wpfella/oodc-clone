@@ -406,14 +406,22 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
           content: (
             <div className="space-y-6">
                 <div className="text-center">
-                    <p className="text-lg text-[var(--text-color-muted)] font-semibold uppercase tracking-widest">Total Savings Strategy</p>
+                    <p className="text-lg text-[var(--text-color-muted)] font-semibold uppercase tracking-widest flex justify-center items-center gap-1.5">Total Savings Strategy
+                        <Tooltip text="The absolute difference in total interest paid across all relevant debts between the existing Bank scenario and the optimized Crown Money scenario.">
+                            <InfoIcon className="h-4 w-4 cursor-pointer text-gray-400 hover:text-gray-600"/>
+                        </Tooltip>
+                    </p>
                     <p className="text-6xl font-black my-4 animate-pulse" style={{color: 'var(--chart-color-wealth)'}}>{formatCurrency(totalInterestSaved)}</p>
                     
                     {otherDebtsStatusQuoInterest > 0 && (
                         <div className="max-w-md mx-auto p-4 bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl border border-emerald-100 dark:border-emerald-900/30 mb-6">
                             <div className="flex flex-col gap-2">
                                 <div className="flex justify-between items-center text-sm">
-                                    <span className="text-slate-500 font-bold uppercase tracking-tighter">Mortgage Optimization Savings</span>
+                                    <span className="text-slate-500 font-bold uppercase tracking-tighter flex items-center gap-1.5">Mortgage Optimization Savings
+                                        <Tooltip text="The interest saved exclusively on your primary home loan by redirecting all surplus cashflow and offsets into it.">
+                                            <InfoIcon className="h-4 w-4 cursor-pointer text-slate-400 hover:text-slate-600"/>
+                                        </Tooltip>
+                                    </span>
                                     <span className="font-black text-slate-700">{formatCurrency(totalInterestSaved - otherDebtsStatusQuoInterest)}</span>
                                 </div>
                                 <div className="flex justify-between items-center text-sm border-t border-emerald-200/50 pt-2">
@@ -463,7 +471,11 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
                         </div>
                     )}
 
-                    <p className="text-lg text-[var(--text-color-muted)] mt-4">Years Saved Off Your Life:</p>
+                    <p className="text-lg text-[var(--text-color-muted)] mt-4 flex justify-center items-center gap-1.5">Years Saved Off Your Life:
+                        <Tooltip text="The total duration of your home loan under the Bank scenario minus the duration under the Crown Money scenario. Represents years of financial freedom gained.">
+                            <InfoIcon className="h-4 w-4 cursor-pointer text-gray-400 hover:text-gray-600"/>
+                        </Tooltip>
+                    </p>
                     <p className="text-5xl font-black my-2" style={{color: 'var(--chart-color-wealth)'}}>{(bankLoanCalculation.termInYears - crownMoneyLoanCalculation.termInYears).toFixed(1)}</p>
                 </div>
                 

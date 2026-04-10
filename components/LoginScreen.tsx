@@ -52,15 +52,20 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess, correctPassword }) => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const userEmail = result.user.email;
-      if (userEmail && userEmail.endsWith('@crown.money')) {
+      if (userEmail && (userEmail.endsWith('@crown.money') || userEmail.endsWith('@outofdebt.com.au'))) {
         onLoginSuccess();
       } else {
         await signOut(auth);
-        setError('Access restricted to @crown.money accounts only.');
+        setError('Access restricted to @crown.money and @outofdebt.com.au accounts only.');
       }
     } catch (err: any) {
       console.error('Google login error:', err);
-      setError('Failed to login with Google. Please ensure Firebase is configured.');
+      // Avoid showing technical popup-closed errors directly to users if they just closed it
+      if (err.code === 'auth/popup-closed-by-user') {
+        setError('Login cancelled.');
+      } else {
+        setError(`Failed to login with Google: ${err.message || 'Unknown error'}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -72,8 +77,8 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess, correctPassword }) => {
     setError('');
     setMessage('');
 
-    if (!email.endsWith('@crown.money')) {
-      setError('Only @crown.money email addresses are allowed.');
+    if (!email.endsWith('@crown.money') && !email.endsWith('@outofdebt.com.au')) {
+      setError('Only @crown.money or @outofdebt.com.au email addresses are allowed.');
       setLoading(false);
       return;
     }

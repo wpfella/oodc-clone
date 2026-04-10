@@ -359,20 +359,32 @@ const Tab1_CurrentLoan: React.FC<Props> = ({ appState, setAppState, calculations
             <div className="grid grid-cols-2 gap-4 text-center">
                 <div className="p-4 bg-black/10 dark:bg-white/5 rounded-lg flex flex-col justify-center items-center">
                     <BanknotesIcon className="h-8 w-8 mb-2 text-[var(--chart-color-bank)]"/>
-                    <h4 className="text-sm text-[var(--text-color-muted)]">Total Interest</h4>
+                    <h4 className="text-sm text-[var(--text-color-muted)] flex items-center justify-center gap-1">Total Interest
+                        <Tooltip text="The total sum of interest you will pay to the bank over the lifetime of the loan, assuming interest rates and repayments remain the same.">
+                            <InfoIcon className="h-4 w-4 cursor-pointer"/>
+                        </Tooltip>
+                    </h4>
                     <p className="text-xl font-bold text-[var(--text-color)]">
                         {formatCurrency(bankLoanCalculation.totalInterest)}
                     </p>
                 </div>
                 <div className="p-4 bg-black/10 dark:bg-white/5 rounded-lg flex flex-col justify-center items-center">
                     <ChartBarIcon className="h-8 w-8 mb-2 text-[var(--chart-color-interest)]"/>
-                    <h4 className="text-sm text-[var(--text-color-muted)]">LVR</h4>
+                    <h4 className="text-sm text-[var(--text-color-muted)] flex items-center justify-center gap-1">LVR
+                        <Tooltip text="Loan-to-Value Ratio: The percentage of your property's value that is mortgaged. LVR over 80% usually incurs Lenders Mortgage Insurance.">
+                            <InfoIcon className="h-4 w-4 cursor-pointer"/>
+                        </Tooltip>
+                    </h4>
                     <p className={`text-xl font-bold ${lvr > 80 ? 'text-red-400' : 'text-[var(--text-color)]'}`}>
                         {lvr.toFixed(1)}%
                     </p>
                 </div>
                 <div className="col-span-2 p-4 bg-black/10 dark:bg-white/5 rounded-lg">
-                    <h4 className="text-sm text-[var(--text-color-muted)] mb-1">Estimated Payoff Time (Bank Scenario)</h4>
+                    <h4 className="text-sm text-[var(--text-color-muted)] mb-1 flex items-center justify-center gap-1">Estimated Payoff Time (Bank Scenario)
+                        <Tooltip text="Calculated by dynamically amortising your Net Loan Amount with your entered Interest Rate and Repayments until the balance is zero.">
+                            <InfoIcon className="h-4 w-4 cursor-pointer"/>
+                        </Tooltip>
+                    </h4>
                     <p className="text-3xl font-bold text-[var(--chart-color-bank)]">
                         {bankLoanCalculation.termInYears === Infinity ? 'Never' : `${bankLoanCalculation.termInYears.toFixed(1)} Years`}
                     </p>

@@ -189,7 +189,11 @@ const Tab2_InterestBreakdown: React.FC<Props> = ({ appState, setAppState, calcul
             <h3 className="text-base font-semibold text-center mb-4 text-[var(--text-color)]">First Year Costs</h3>
             <div className="grid grid-cols-2 gap-4 text-center">
                 <div className="p-3 bg-black/10 dark:bg-white/5 rounded-lg col-span-2">
-                    <h4 className="text-xs sm:text-sm text-[var(--text-color-muted)]">Total Annual Repayments</h4>
+                    <h4 className="text-xs sm:text-sm text-[var(--text-color-muted)] flex items-center justify-center gap-1">Total Annual Repayments
+                        <Tooltip text="Sum of 12 months minimum repayment, without any extra factors.">
+                            <InfoIcon className="h-3 w-3 text-[var(--text-color-muted)] cursor-pointer"/>
+                        </Tooltip>
+                    </h4>
                     <p className="text-xl sm:text-2xl font-bold text-[var(--text-color)] print:text-black">{formatCurrency(annualRepayment)}</p>
                 </div>
                 <div className="p-3 bg-black/10 dark:bg-white/5 rounded-lg">
@@ -202,11 +206,19 @@ const Tab2_InterestBreakdown: React.FC<Props> = ({ appState, setAppState, calcul
                     <p className="text-lg sm:text-xl font-bold text-[var(--chart-color-principal)] print:text-blue-600">{formatCurrency(annualDebtReduction)}</p>
                 </div>
                 <div className="p-3 bg-black/10 dark:bg-white/5 rounded-lg">
-                    <h4 className="text-xs sm:text-sm text-[var(--text-color-muted)]">Annual Interest Paid</h4>
+                    <h4 className="text-xs sm:text-sm text-[var(--text-color-muted)] flex items-center justify-center gap-1">Annual Interest Paid
+                        <Tooltip text="The exact amount in the first 12 months taken by the bank as interest, purely sunk cost.">
+                            <InfoIcon className="h-3 w-3 text-[var(--text-color-muted)] cursor-pointer"/>
+                        </Tooltip>
+                    </h4>
                     <p className="text-lg sm:text-xl font-bold text-[var(--chart-color-interest)] print:text-pink-600">{formatCurrency(firstYearInterest)}</p>
                 </div>
                 <div className="p-3 bg-black/10 dark:bg-white/5 rounded-lg col-span-2">
-                    <h4 className="text-xs sm:text-sm text-[var(--text-color-muted)]">Average Weekly Interest Paid (First Year)</h4>
+                    <h4 className="text-xs sm:text-sm text-[var(--text-color-muted)] flex items-center justify-center gap-1">Average Weekly Interest Paid (First Year)
+                        <Tooltip text="Simply the Annual Interest Paid divided by 52.">
+                            <InfoIcon className="h-3 w-3 text-[var(--text-color-muted)] cursor-pointer"/>
+                        </Tooltip>
+                    </h4>
                     <p className="text-lg sm:text-xl font-bold text-[var(--text-color)] print:text-black">{formatCurrency(weeklyInterestPaid)}</p>
                 </div>
             </div>
@@ -219,7 +231,11 @@ const Tab2_InterestBreakdown: React.FC<Props> = ({ appState, setAppState, calcul
         <>
             <div className="grid grid-cols-2 gap-4 text-center">
                 <div className="p-3 bg-black/10 dark:bg-white/5 rounded-lg col-span-2">
-                    <h4 className="text-xs sm:text-sm text-[var(--text-color-muted)]">Total Repayments (Principal + Interest)</h4>
+                    <h4 className="text-xs sm:text-sm text-[var(--text-color-muted)] flex items-center justify-center gap-1">Total Repayments (Principal + Interest)
+                        <Tooltip text="The cumulative sum of all payments over the entire duration of the loan until fully paid.">
+                            <InfoIcon className="h-3 w-3 text-[var(--text-color-muted)] cursor-pointer"/>
+                        </Tooltip>
+                    </h4>
                     <p className="text-xl sm:text-2xl font-bold text-[var(--text-color)] print:text-black">{formatCurrency(bankLoanCalculation.totalPaid)}</p>
                 </div>
                 <div className="p-3 bg-black/10 dark:bg-white/5 rounded-lg">
@@ -232,11 +248,19 @@ const Tab2_InterestBreakdown: React.FC<Props> = ({ appState, setAppState, calcul
                     <p className="text-lg sm:text-xl font-bold text-[var(--chart-color-principal)] print:text-blue-600">{formatCurrency(netLoanAmount)}</p>
                 </div>
                 <div className="p-3 bg-black/10 dark:bg-white/5 rounded-lg">
-                    <h4 className="text-xs sm:text-sm text-[var(--text-color-muted)]">Total Interest Paid</h4>
+                    <h4 className="text-xs sm:text-sm text-[var(--text-color-muted)] flex items-center justify-center gap-1">Total Interest Paid
+                         <Tooltip text="The total sunk cost paid to the bank over your loan's term.">
+                            <InfoIcon className="h-3 w-3 text-[var(--text-color-muted)] cursor-pointer"/>
+                        </Tooltip>
+                    </h4>
                     <p className="text-lg sm:text-xl font-bold text-[var(--chart-color-interest)] print:text-pink-600">{formatCurrency(bankLoanCalculation.totalInterest)}</p>
                 </div>
                 <div className="p-3 bg-black/10 dark:bg-white/5 rounded-lg col-span-2">
-                    <h4 className="text-xs sm:text-sm text-[var(--text-color-muted)]">Interest as a Percentage of Principal Paid</h4>
+                    <h4 className="text-xs sm:text-sm text-[var(--text-color-muted)] flex items-center justify-center gap-1">Interest as a Percentage of Principal Paid
+                        <Tooltip text="Calculated as (Total Interest / Net Principal). Shows the additional overhead cost relative to what you originally borrowed.">
+                            <InfoIcon className="h-3 w-3 text-[var(--text-color-muted)] cursor-pointer"/>
+                        </Tooltip>
+                    </h4>
                     <p className="text-lg sm:text-xl font-bold text-[var(--text-color)] print:text-black">
                         {interestAsPercentageOfPrincipal.toFixed(1)}%
                     </p>

@@ -806,7 +806,11 @@ const Tab3_IncomeExpenses: React.FC<Props> = ({ appState, setAppState, calculati
         }>
             <div className="space-y-3 text-sm">
                 <div className="flex justify-between items-center p-2 rounded-lg" style={{ backgroundColor: 'var(--color-positive-bg)' }}>
-                    <span className="font-medium" style={{ color: 'var(--color-positive-text)'}}>Total Monthly Household Income</span>
+                    <span className="font-medium flex items-center gap-1" style={{ color: 'var(--color-positive-text)'}}>Total Monthly Household Income
+                        <Tooltip text="The net amount you earn per month across all income sources combined.">
+                            <InfoIcon className="h-4 w-4 cursor-pointer text-white/70 hover:text-white"/>
+                        </Tooltip>
+                    </span>
                     <span className="font-semibold" style={{ color: 'var(--color-positive-text)'}}>{formatCurrency(incomes.reduce((s,i) => s + getMonthlyAmount(i.amount, i.frequency), 0))}</span>
                 </div>
                  {activeInvestmentCashflow !== 0 && (
@@ -852,7 +856,11 @@ const Tab3_IncomeExpenses: React.FC<Props> = ({ appState, setAppState, calculati
                         })}
                     </div>
                     <div className="flex justify-between items-center p-2 rounded-lg mt-2" style={{ backgroundColor: 'var(--color-negative-bg)' }}>
-                        <span className="font-medium" style={{ color: 'var(--color-negative-text)' }}>Total Monthly Living Expenses</span>
+                        <span className="font-medium flex items-center gap-1" style={{ color: 'var(--color-negative-text)' }}>Total Monthly Living Expenses
+                            <Tooltip text="The sum of all monthly FFF, Hard, Soft, and Other expenses. Excludes home loan repayments.">
+                                <InfoIcon className="h-4 w-4 cursor-pointer text-white/70 hover:text-white"/>
+                            </Tooltip>
+                        </span>
                         <span className="font-semibold" style={{ color: 'var(--color-negative-text)' }}>{formatCurrency(expenses.reduce((s,e) => s + getMonthlyAmount(e.amount, e.frequency), 0))}</span>
                     </div>
                 </div>
