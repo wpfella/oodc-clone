@@ -1,0 +1,44 @@
+{
+  "Form Field Details": {
+    "Person 1": "John Smith",
+    "Person 2": "Jenny Smith",
+    "FOOD FUN FUEL": {
+      "Food": 200,
+      "Fun": 125,
+      "Fuel": 75
+    },
+    "LOAN DETAILS": {
+      "Loan Amount": 350000,
+      "Loan Offset Balance": 50000,
+      "Property Value": 450000,
+      "Loan Repayment": 2500,
+      "Interest Rate": 6.5
+    },
+    "TOTAL MONTHLY INCOME & EXPENSES": {
+      "Total Monthly Income": 8500,
+      "Total Monthly Expenses": 3142,
+      "Monthly Surplus": 5358
+    },
+    "SOFT EXPENSES": {
+      "Miscellaneous": "200 monthly",
+      "Holiday": "3000 annually",
+      "Gifts": "500 annually",
+      "Clothes": "100 monthly"
+    },
+    "HARD EXPENSES": {
+      "Gas": "300 quarterly",
+      "Car Rego": "800 annually",
+      "Phone": "150 monthly",
+      "Insurance- Life/income/Pet": "200 monthly",
+      "Insurance- Car/house/health": "1000 annually",
+      "Child Care": "0 fortnightly",
+      "School/Education": "0 annually",
+      "Rates": "500 quarterly",
+      "Debt Repay": "0 monthly",
+      "Subs": "50 monthly",
+      "Rent": "0 weekly",
+      "Kids Activity": "0 annually"
+    },
+    "Date of Submission": "2026-04-10T10:15:31.473Z"
+  }
+}

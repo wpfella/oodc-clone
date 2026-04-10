@@ -141,7 +141,7 @@ const FutureChangesSection: React.FC<FutureChangesSectionProps> = React.memo(({ 
     const [focusedDateField, setFocusedDateField] = useState<string | null>(null);
 
     useEffect(() => {
-        const allItems = new Set([...incomes.map(i => i.name), ...expenses.map(e => e.name)]);
+        const allItems = new Set([...(incomes || []).map(i => i.name), ...(expenses || []).map(e => e.name)]);
         const initialCustomState = futureChanges.reduce((acc, change) => {
             if (!allItems.has(change.description)) {
                 acc[change.id] = true;
@@ -204,7 +204,7 @@ const FutureChangesSection: React.FC<FutureChangesSectionProps> = React.memo(({ 
             <p className="text-sm text-[var(--text-color-muted)] mb-4 -mt-2 print:hidden">
                 Plan for known, ongoing changes to your budget. For example: a pay rise, a child's daycare fees stopping, or a temporary change in income. This helps create a more accurate long-term forecast.
             </p>
-            {futureChanges.map((change, index) => {
+            {(futureChanges || []).map((change, index) => {
                 const startDateKey = `start-${change.id}`;
                 const isStartDateFocused = focusedDateField === startDateKey;
                 
@@ -225,10 +225,10 @@ const FutureChangesSection: React.FC<FutureChangesSectionProps> = React.memo(({ 
                                 >
                                     <option value="" disabled>Select or create an event...</option>
                                     <optgroup label="Incomes">
-                                        {incomes.map(i => <option key={`inc-${i.id}`} value={`income:${i.name}`}>{i.name}</option>)}
+                                        {(incomes || []).map(i => <option key={`inc-${i.id}`} value={`income:${i.name}`}>{i.name}</option>)}
                                     </optgroup>
                                     <optgroup label="Expenses">
-                                        {expenses.map(e => <option key={`exp-${e.id}`} value={`expense:${e.name}`}>{e.name}</option>)}
+                                        {(expenses || []).map(e => <option key={`exp-${e.id}`} value={`expense:${e.name}`}>{e.name}</option>)}
                                     </optgroup>
                                     <option value="custom">— New Custom Event —</option>
                                 </select>
@@ -359,7 +359,7 @@ const FutureChangesSection: React.FC<FutureChangesSectionProps> = React.memo(({ 
                 );
             })}
             <div className="hidden print:block space-y-2">
-                {futureChanges.map(change => (
+                {(futureChanges || []).map(change => (
                     <div key={`print-${change.id}`} className="grid grid-cols-12 text-black py-1 border-b border-gray-200 text-sm">
                         <span className="col-span-3">{change.description}</span>
                         <span className="col-span-1 capitalize">{change.type}</span>
@@ -516,7 +516,7 @@ const FutureLumpSumSection: React.FC<FutureLumpSumSectionProps> = React.memo(({ 
 
     return (
         <div className="space-y-4">
-            {futureLumpSums.map((lump, index) => {
+            {(futureLumpSums || []).map((lump, index) => {
                 const dateKey = `lump-date-${lump.id}`;
                 const isDateFocused = focusedDateField === dateKey;
 
@@ -586,7 +586,7 @@ const FutureLumpSumSection: React.FC<FutureLumpSumSectionProps> = React.memo(({ 
                 );
             })}
              <div className="hidden print:block space-y-2">
-                {futureLumpSums.map(lump => (
+                {(futureLumpSums || []).map(lump => (
                     <div key={`print-lump-${lump.id}`} className="grid grid-cols-12 text-black py-1 border-b border-gray-200 text-sm">
                         <span className="col-span-5">{lump.description}</span>
                         <span className="col-span-2 capitalize">{lump.type}</span>
@@ -643,6 +643,75 @@ const Tab3_IncomeExpenses: React.FC<Props> = ({ appState, setAppState, calculati
   const removeListItem = <T extends {id: number}>(list: T[], setList: (list: T[]) => void, id: number) => {
     setList(list.filter(item => item.id !== id));
   };
+  
+  const handleImportExpenses = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const json = JSON.parse(e.target?.result as string);
+        const details = json?.["Form Field Details"];
+        if (!details) {
+            throw new Error("Invalid Expenses JSON format - missing 'Form Field Details'");
+        }
+
+        const newExpenses: ExpenseItem[] = [];
+        let idCounter = Date.now();
+
+        const parseAmount = (val: string | number): {amount: number, frequency: any} => {
+            if (typeof val === 'number') return { amount: val, frequency: 'monthly' };
+            if (!val) return { amount: 0, frequency: 'monthly' };
+            
+            const parts = String(val).toLowerCase().trim().split(' ');
+            const amountStr = parts[0].replace(/[^0-9.]/g, '');
+            const amount = parseFloat(amountStr) || 0;
+            let frequency = 'monthly';
+            if (parts.length > 1) {
+                const freqStr = parts[1];
+                if (freqStr.includes('week')) frequency = 'weekly';
+                else if (freqStr.includes('fortnight')) frequency = 'fortnightly';
+                else if (freqStr.includes('month')) frequency = 'monthly';
+                else if (freqStr.includes('quarter')) frequency = 'quarterly';
+                else if (freqStr.includes('annual') || freqStr.includes('year')) frequency = 'annually';
+            }
+            return { amount, frequency };
+        };
+
+        const addCategory = (catName: string, targetCategory: ExpenseItem['category']) => {
+            if (details[catName]) {
+                Object.entries(details[catName]).forEach(([name, val]) => {
+                    const { amount, frequency } = parseAmount(val as string | number);
+                    newExpenses.push({
+                        id: idCounter++,
+                        name,
+                        amount,
+                        category: targetCategory,
+                        frequency: frequency as any
+                    });
+                });
+            }
+        };
+
+        addCategory("FOOD FUN FUEL", "FFF");
+        addCategory("SOFT EXPENSES", "Soft Expenses");
+        addCategory("HARD EXPENSES", "Hard Expenses");
+
+        setAppState(prev => ({
+            ...prev,
+            expenses: [...(prev.expenses || []), ...newExpenses]
+        }));
+        
+        // Reset file input
+        event.target.value = '';
+      } catch (error: any) {
+        console.error("Failed to parse expenses scenario:", error);
+        alert(`Error importing expenses: ${error.message}`);
+      }
+    };
+    reader.readAsText(file);
+  };
 
   const formatCurrency = (value: number, digits = 0) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value);
 
@@ -655,7 +724,7 @@ const Tab3_IncomeExpenses: React.FC<Props> = ({ appState, setAppState, calculati
 
   const renderIncomeRows = () => (
     <>
-      {incomes.map((income, index) => (
+      {(incomes || []).map((income, index) => (
         <div key={income.id} className="items-center">
             <div className="grid grid-cols-12 gap-2 print:hidden">
               <input type="text" value={income.name} onChange={e => handleListChange(incomes, (l) => setAppState(s => ({...s, incomes: l})), index, 'name', e.target.value)} className={`col-span-4 ${inputClasses}`} placeholder="Income Source"/>
@@ -681,7 +750,7 @@ const Tab3_IncomeExpenses: React.FC<Props> = ({ appState, setAppState, calculati
 
   const renderExpenseRows = (category: ExpenseItem['category']) => (
     <>
-      {expenses.filter(e => e.category === category).map((expense) => {
+      {(expenses || []).filter(e => e.category === category).map((expense) => {
           const originalIndex = expenses.findIndex(e => e.id === expense.id);
           return (
             <div key={expense.id} className="items-center">
@@ -764,7 +833,24 @@ const Tab3_IncomeExpenses: React.FC<Props> = ({ appState, setAppState, calculati
           <div className="space-y-2">{renderIncomeRows()}</div>
           <button onClick={() => addListItem(incomes, (l) => setAppState(s => ({...s, incomes: l})), {name: '', amount: 0, frequency: 'weekly'})} className="mt-4 text-sm text-[var(--title-color)] hover:opacity-80 transition-opacity font-semibold print:hidden">+ Add Income</button>
         </Card>
-        <Card title="Expenses">
+        <Card title={
+            <div className="flex justify-between items-center w-full">
+                <span>Expenses</span>
+                <div className="relative overflow-hidden inline-block group">
+                    <button className="px-3 py-1.5 text-xs font-bold text-[#5B21B6] bg-[#5B21B6]/10 rounded-lg border border-[#5B21B6]/20 group-hover:bg-[#5B21B6] group-hover:text-white transition-all print:hidden uppercase tracking-widest flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                        Import JSON
+                    </button>
+                    <input 
+                        type="file" 
+                        accept=".json" 
+                        onChange={handleImportExpenses}
+                        className="absolute w-full h-full inset-0 opacity-0 cursor-pointer"
+                        title="Upload Expenses JSON Scenario"
+                    />
+                </div>
+            </div>
+        }>
             <h4 className="text-md font-semibold text-[var(--text-color-muted)] mt-4 mb-2 print:text-black">FFF (Food, Fun, Fuel)</h4>
             <div className="space-y-2">{renderExpenseRows('FFF')}</div>
             <button onClick={() => addListItem(expenses, (l) => setAppState(s => ({...s, expenses: l})), {name: '', amount: 0, category: 'FFF', frequency: 'weekly'})} className="mt-2 text-sm text-[var(--title-color)] hover:opacity-80 transition-opacity font-semibold print:hidden">+ Add FFF</button>

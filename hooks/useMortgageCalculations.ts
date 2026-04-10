@@ -240,7 +240,7 @@ export const calculateAmortization = (
 
 export const useMortgageCalculations = (appState: AppState) => {
     const { loan, incomes, expenses, otherDebts, investmentProperties, futureChanges, futureLumpSums, investmentAmountPercentage, investmentGrowthRate, idealRetirementAge, propertyGrowthRate, crownMoneyInterestRate, payoffStrategy, people } = appState;
-    const youngestPersonAge = useMemo(() => Math.min(...people.map(p => p.age)), [people]);
+    const youngestPersonAge = useMemo(() => Math.min(...(people || []).map(p => p.age)), [people]);
 
     const rentalGrowthChanges = useMemo(() => {
         const changes: FutureChange[] = [];
@@ -459,10 +459,10 @@ export const useMortgageCalculations = (appState: AppState) => {
         try {
             const bankPrimarySchedule = bankLoanCalculation.amortizationSchedule;
             const crownPrimarySchedule = crownMoneyLoanCalculation.amortizationSchedule;
-            const bankInvSchedules = investmentLoanCalculations.investmentPayoffSchedule.map((p: any) => ({ id: p.propertyId, schedule: p.bank.amortizationSchedule }));
-            const crownInvSchedules = investmentLoanCalculations.investmentPayoffSchedule.map((p: any) => ({ id: p.propertyId, schedule: p.crown.amortizationSchedule }));
+            const bankInvSchedules = (investmentLoanCalculations.investmentPayoffSchedule || []).map((p: any) => ({ id: p.propertyId, schedule: p.bank.amortizationSchedule }));
+            const crownInvSchedules = (investmentLoanCalculations.investmentPayoffSchedule || []).map((p: any) => ({ id: p.propertyId, schedule: p.crown.amortizationSchedule }));
             
-            const maxMonths = Math.ceil(Math.max(bankPrimarySchedule.length, crownPrimarySchedule.length, ...bankInvSchedules.map(s => s.schedule.length), ...crownInvSchedules.map(s => s.schedule.length), 1));
+            const maxMonths = Math.ceil(Math.max(bankPrimarySchedule.length, crownPrimarySchedule.length, ...(bankInvSchedules || []).map(s => s.schedule.length), ...(crownInvSchedules || []).map(s => s.schedule.length), 1));
             if (!isFinite(maxMonths) || maxMonths === 0) return [];
 
             const primaryStartDebt = loan.amount - (loan.offsetBalance || 0);

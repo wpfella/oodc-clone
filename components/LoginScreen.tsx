@@ -18,7 +18,7 @@ interface Props {
   correctPassword: string;
 }
 
-type AuthMode = 'login' | 'signup' | 'forgot-password' | 'master-password';
+type AuthMode = 'login' | 'signup' | 'forgot-password';
 
 const LoginScreen: React.FC<Props> = ({ onLoginSuccess, correctPassword }) => {
   const [mode, setMode] = useState<AuthMode>('login');
@@ -60,7 +60,6 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess, correctPassword }) => {
       }
     } catch (err: any) {
       console.error('Google login error:', err);
-      // Avoid showing technical popup-closed errors directly to users if they just closed it
       if (err.code === 'auth/popup-closed-by-user') {
         setError('Login cancelled.');
       } else {
@@ -106,24 +105,6 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess, correctPassword }) => {
     }
   };
 
-  const handleForgotPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    setMessage('');
-
-    try {
-      await sendPasswordResetEmail(auth, email);
-      setMessage('Password reset email sent! Check your inbox.');
-      setMode('login');
-    } catch (err: any) {
-      console.error('Reset error:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#F8F8F8] to-[#E6DEEE] p-6">
       <motion.div 
@@ -131,49 +112,22 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess, correctPassword }) => {
         animate={{ opacity: 1, y: 0 }}
         className="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl p-10 border border-white/50 backdrop-blur-xl"
       >
-        <div className="flex flex-col items-center mb-10">
+        <div className="flex flex-col items-center mb-8">
           <motion.div 
             whileHover={{ scale: 1.05 }}
-            className="mb-8"
+            className="mb-6"
           >
             <CrownLogo className="h-20 w-auto" />
           </motion.div>
           <h1 className="text-3xl font-black text-[#250B40] tracking-tight text-center">Out of Debt</h1>
-          <p className="text-[#583d77] text-sm mt-3 font-bold uppercase tracking-[0.2em] opacity-60">
-            {mode === 'master-password' ? 'Master Access' : 'Calculator Portal'}
+          <p className="text-[#583d77] text-sm mt-2 font-bold uppercase tracking-[0.2em] opacity-60">
+            Calculator Portal
           </p>
         </div>
 
         <div className="space-y-6">
           <AnimatePresence mode="wait">
-            {mode === 'master-password' ? (
-              <motion.form
-                key="master-password"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                onSubmit={handleMasterPasswordSubmit}
-                className="space-y-6"
-              >
-                <div className="space-y-3">
-                  <label className="block text-[10px] font-black text-[#250B40] uppercase tracking-[0.2em] ml-1">Master Password</label>
-                  <input
-                    type="password"
-                    value={masterPassword}
-                    onChange={(e) => setMasterPassword(e.target.value)}
-                    className="w-full px-6 py-4 bg-[#F8F8F8] border-2 border-[#E6DEEE] rounded-2xl focus:ring-4 focus:ring-[#5B21B6]/10 focus:border-[#5B21B6] transition-all outline-none text-[#250B40] font-bold"
-                    placeholder="••••••••"
-                    required
-                  />
-                </div>
-                <button type="submit" className="w-full py-5 bg-[#5B21B6] text-white rounded-2xl font-black text-lg shadow-xl shadow-[#5B21B6]/30 hover:bg-[#4c1d95] transition-all uppercase tracking-widest">
-                  Enter Dashboard
-                </button>
-                <button type="button" onClick={() => setMode('login')} className="w-full text-xs text-[#5B21B6] font-bold uppercase tracking-widest">
-                  Back to Login
-                </button>
-              </motion.form>
-            ) : mode === 'forgot-password' ? (
+            {mode === 'forgot-password' ? (
               <motion.form
                 key="forgot-password"
                 initial={{ opacity: 0, x: -20 }}
@@ -208,73 +162,83 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess, correctPassword }) => {
                 exit={{ opacity: 0, x: 20 }}
                 className="space-y-6"
               >
+                {/* Prominent Master Password Section */}
+                <form onSubmit={handleMasterPasswordSubmit} className="space-y-4 bg-[#f8f6fb] p-5 rounded-2xl border border-[#d2c2e5]">
+                  <div className="space-y-2">
+                    <label className="block text-[10px] font-black text-[#250B40] uppercase tracking-[0.2em] ml-1">Master Access</label>
+                    <input
+                      type="password"
+                      value={masterPassword}
+                      onChange={(e) => setMasterPassword(e.target.value)}
+                      className="w-full px-4 py-3 bg-white border-2 border-[#E6DEEE] rounded-xl focus:ring-4 focus:ring-[#5B21B6]/10 focus:border-[#5B21B6] transition-all outline-none text-[#250B40] font-bold"
+                      placeholder="Enter Master Password"
+                    />
+                  </div>
+                  <button type="submit" className="w-full py-3 bg-[#5B21B6] text-white rounded-xl font-black text-sm shadow-md hover:bg-[#4c1d95] transition-all uppercase tracking-widest">
+                    Quick Login
+                  </button>
+                </form>
+
+                <div className="relative pt-2">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t-2 border-[#E6DEEE] border-dashed"></div>
+                  </div>
+                  <div className="relative flex justify-center text-[10px] uppercase tracking-[0.3em]">
+                    <span className="bg-white px-4 text-[#583d77] font-black">Or use account</span>
+                  </div>
+                </div>
+
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={handleGoogleLogin}
                   disabled={loading}
-                  className="w-full py-4 px-6 bg-white border-2 border-[#E6DEEE] text-[#250B40] rounded-2xl font-black flex items-center justify-center gap-4 hover:border-[#5B21B6] hover:bg-[#F8F8F8] transition-all shadow-lg shadow-black/5 disabled:opacity-50"
+                  className="w-full py-3 px-6 bg-white border-2 border-[#E6DEEE] text-[#250B40] rounded-xl font-black flex items-center justify-center gap-4 hover:border-[#5B21B6] hover:bg-[#F8F8F8] transition-all shadow-sm disabled:opacity-50"
                 >
-                  {loading ? (
-                    <div className="w-6 h-6 border-3 border-[#5B21B6]/30 border-t-[#5B21B6] rounded-full animate-spin"></div>
-                  ) : (
-                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-6 h-6" />
-                  )}
+                  <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
                   <span className="text-sm uppercase tracking-widest">
-                    {loading ? 'Connecting...' : 'Google Login'}
+                    Google Login
                   </span>
                 </motion.button>
 
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t-2 border-[#E6DEEE] border-dashed"></div>
-                  </div>
-                  <div className="relative flex justify-center text-[10px] uppercase tracking-[0.3em]">
-                    <span className="bg-white px-4 text-[#583d77] font-black">Or use email</span>
-                  </div>
-                </div>
-
-                <form onSubmit={handleEmailPasswordAuth} className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="block text-[10px] font-black text-[#250B40] uppercase tracking-[0.2em] ml-1">Email</label>
+                <form onSubmit={handleEmailPasswordAuth} className="space-y-3">
+                  <div className="space-y-1">
                     <input
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full px-6 py-3 bg-[#F8F8F8] border-2 border-[#E6DEEE] rounded-2xl focus:ring-4 focus:ring-[#5B21B6]/10 focus:border-[#5B21B6] transition-all outline-none text-[#250B40] font-bold"
-                      placeholder="name@crown.money"
+                      className="w-full px-4 py-3 bg-[#F8F8F8] border-2 border-[#E6DEEE] rounded-xl focus:ring-4 focus:ring-[#5B21B6]/10 focus:border-[#5B21B6] transition-all outline-none text-[#250B40] font-bold text-sm"
+                      placeholder="Email (name@crown.money)"
                       required
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="block text-[10px] font-black text-[#250B40] uppercase tracking-[0.2em] ml-1">Password</label>
+                  <div className="space-y-1">
                     <input
                       type="password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full px-6 py-3 bg-[#F8F8F8] border-2 border-[#E6DEEE] rounded-2xl focus:ring-4 focus:ring-[#5B21B6]/10 focus:border-[#5B21B6] transition-all outline-none text-[#250B40] font-bold"
-                      placeholder="••••••••"
+                      className="w-full px-4 py-3 bg-[#F8F8F8] border-2 border-[#E6DEEE] rounded-xl focus:ring-4 focus:ring-[#5B21B6]/10 focus:border-[#5B21B6] transition-all outline-none text-[#250B40] font-bold text-sm"
+                      placeholder="Password"
                       required
                     />
                   </div>
                   
-                  {mode === 'login' && (
-                    <button type="button" onClick={() => setMode('forgot-password')} className="text-[10px] text-[#5B21B6] font-bold uppercase tracking-widest ml-1">
-                      Forgot Password?
-                    </button>
-                  )}
+                  <div className="flex justify-between items-center mb-1">
+                    {mode === 'login' && (
+                      <button type="button" onClick={() => setMode('forgot-password')} className="text-[10px] text-[#5B21B6] font-bold uppercase tracking-widest ml-1">
+                        Forgot Password?
+                      </button>
+                    )}
+                  </div>
 
-                  <button type="submit" disabled={loading} className="w-full py-4 bg-[#5B21B6] text-white rounded-2xl font-black text-lg shadow-xl shadow-[#5B21B6]/30 hover:bg-[#4c1d95] transition-all uppercase tracking-widest disabled:opacity-50">
-                    {loading ? 'Processing...' : mode === 'login' ? 'Login' : 'Sign Up'}
+                  <button type="submit" disabled={loading} className="w-full py-3 bg-[#e4daf1] text-[#250B40] rounded-xl font-black text-sm hover:bg-[#d0bfe3] transition-all uppercase tracking-widest disabled:opacity-50">
+                    {loading ? 'Processing...' : mode === 'login' ? 'Login with Email' : 'Sign Up with Email'}
                   </button>
                 </form>
 
-                <div className="flex flex-col gap-3 items-center">
-                  <button onClick={() => setMode(mode === 'login' ? 'signup' : 'login')} className="text-xs text-[#5B21B6] font-bold uppercase tracking-widest">
+                <div className="text-center mt-2">
+                  <button onClick={() => setMode(mode === 'login' ? 'signup' : 'login')} className="text-[10px] text-[#5B21B6] font-bold uppercase tracking-widest opacity-80">
                     {mode === 'login' ? "Don't have an account? Sign Up" : "Already have an account? Login"}
-                  </button>
-                  <button onClick={() => setMode('master-password')} className="text-[10px] text-[#583d77] font-bold uppercase tracking-widest opacity-60">
-                    Use Master Access
                   </button>
                 </div>
               </motion.div>
@@ -287,7 +251,7 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess, correctPassword }) => {
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
-                className={`p-4 rounded-2xl text-xs font-black uppercase tracking-widest text-center ${error ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-600'}`}
+                className={`p-3 rounded-xl text-[10px] font-black uppercase tracking-widest text-center ${error ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-600'}`}
               >
                 {error || message}
               </motion.div>
@@ -295,10 +259,10 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess, correctPassword }) => {
           </AnimatePresence>
         </div>
 
-        <div className="mt-10 text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-[#F8F8F8] rounded-full border border-[#E6DEEE]">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-            <p className="text-[10px] text-[#583d77] uppercase tracking-[0.2em] font-black">Secure Portal</p>
+        <div className="mt-8 text-center pt-4 border-t border-dashed border-[#E6DEEE]">
+          <div className="inline-flex items-center gap-2">
+            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+            <p className="text-[9px] text-[#583d77] uppercase tracking-[0.2em] font-black">Secure Portal</p>
           </div>
         </div>
       </motion.div>
@@ -307,3 +271,4 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess, correctPassword }) => {
 };
 
 export default LoginScreen;
+

@@ -1,0 +1,228 @@
+{
+  "loan": {
+    "amount": 700000,
+    "propertyValue": 1400000,
+    "interestRate": 5.84,
+    "repayment": 4152,
+    "frequency": "monthly",
+    "offsetBalance": 0
+  },
+  "people": [
+    {
+      "id": 1,
+      "name": "Person 1",
+      "age": 41
+    },
+    {
+      "id": 2,
+      "name": "Person 2",
+      "age": 36
+    }
+  ],
+  "incomes": [
+    {
+      "id": 1,
+      "name": "Person 1 Income",
+      "amount": 14500,
+      "frequency": "monthly"
+    },
+    {
+      "id": 2,
+      "name": "Person 2 Income",
+      "amount": 4000,
+      "frequency": "monthly"
+    }
+  ],
+  "expenses": [
+    {
+      "id": 1,
+      "name": "Food",
+      "amount": 400,
+      "category": "FFF",
+      "frequency": "weekly"
+    },
+    {
+      "id": 2,
+      "name": "Fun",
+      "amount": 500,
+      "category": "FFF",
+      "frequency": "weekly"
+    },
+    {
+      "id": 3,
+      "name": "Fuel",
+      "amount": 150,
+      "category": "FFF",
+      "frequency": "weekly"
+    },
+    {
+      "id": 4,
+      "name": "Holidays",
+      "amount": 25000,
+      "category": "Soft Expenses",
+      "frequency": "annually"
+    },
+    {
+      "id": 5,
+      "name": "MISC",
+      "amount": 4000,
+      "category": "Soft Expenses",
+      "frequency": "annually"
+    },
+    {
+      "id": 6,
+      "name": "Gifts",
+      "amount": 5000,
+      "category": "Soft Expenses",
+      "frequency": "annually"
+    },
+    {
+      "id": 19,
+      "name": "Clothes and beauty",
+      "amount": 5000,
+      "category": "Soft Expenses",
+      "frequency": "annually"
+    },
+    {
+      "id": 7,
+      "name": "Gas etc",
+      "amount": 900,
+      "category": "Hard Expenses",
+      "frequency": "quarterly"
+    },
+    {
+      "id": 8,
+      "name": "Car Rego etc",
+      "amount": 2000,
+      "category": "Hard Expenses",
+      "frequency": "annually"
+    },
+    {
+      "id": 9,
+      "name": "Phone etc",
+      "amount": 300,
+      "category": "Hard Expenses",
+      "frequency": "monthly"
+    },
+    {
+      "id": 11,
+      "name": "Insurance- Car",
+      "amount": 2000,
+      "category": "Hard Expenses",
+      "frequency": "annually"
+    },
+    {
+      "id": 12,
+      "name": "Insurance - health",
+      "amount": 2700,
+      "category": "Hard Expenses",
+      "frequency": "annually"
+    },
+    {
+      "id": 13,
+      "name": "Pets",
+      "amount": 100,
+      "category": "Hard Expenses",
+      "frequency": "weekly"
+    },
+    {
+      "id": 14,
+      "name": "Insurance - house",
+      "amount": 1000,
+      "category": "Hard Expenses",
+      "frequency": "annually"
+    },
+    {
+      "id": 15,
+      "name": "Rates",
+      "amount": 3000,
+      "category": "Hard Expenses",
+      "frequency": "annually"
+    },
+    {
+      "id": 16,
+      "name": "Subs",
+      "amount": 200,
+      "category": "Hard Expenses",
+      "frequency": "monthly"
+    },
+    {
+      "id": 17,
+      "name": "day care fees",
+      "amount": 240,
+      "category": "Hard Expenses",
+      "frequency": "weekly"
+    },
+    {
+      "name": "Medical",
+      "amount": 200,
+      "category": "Hard Expenses",
+      "frequency": "monthly",
+      "id": 1772436146990
+    },
+    {
+      "name": "hobbies",
+      "amount": 100,
+      "category": "Hard Expenses",
+      "frequency": "weekly",
+      "id": 1772436429404
+    },
+    {
+      "name": "Isla's etf fund",
+      "amount": 500,
+      "category": "Soft Expenses",
+      "frequency": "monthly",
+      "id": 1775807796647
+    }
+  ],
+  "otherDebts": [
+    {
+      "id": 1775808781930,
+      "name": "Car Loan",
+      "amount": 88000,
+      "interestRate": 6.79,
+      "repayment": 821.42,
+      "frequency": "monthly",
+      "remainingTerm": 5
+    },
+    {
+      "id": 1775808818320,
+      "name": "C C",
+      "amount": 8000,
+      "interestRate": 12.99,
+      "repayment": 200,
+      "frequency": "monthly",
+      "remainingTerm": 10
+    }
+  ],
+  "futureChanges": [],
+  "futureLumpSums": [
+    {
+      "description": "buffer",
+      "type": "expense",
+      "amount": 10000,
+      "date": "2026-04-10",
+      "id": 1775809025558
+    }
+  ],
+  "investmentProperties": [],
+  "crownMoneyInterestRate": 6.74,
+  "clientEmail": "shanefitzpatrick84@gmail.com",
+  "clientPhone": "",
+  "investmentAmountPercentage": 50,
+  "investmentGrowthRate": 4,
+  "idealRetirementAge": 63,
+  "propertyGrowthRate": 3,
+  "payoffStrategy": "snowball",
+  "currentLender": "",
+  "numberOfKids": 1,
+  "allPartiesInAttendance": "Only 1 of 2 Showed",
+  "debtRecyclingEnabled": true,
+  "debtRecyclingInvestmentRate": 8,
+  "debtRecyclingLoanInterestRate": 6.5,
+  "marginalTaxRate": 32.5,
+  "debtRecyclingPercentage": 100,
+  "notepadContent": "",
+  "investmentCashflowScenario": "crown",
+  "customSections": []
+}

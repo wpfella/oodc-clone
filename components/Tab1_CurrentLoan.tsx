@@ -327,7 +327,7 @@ const Tab1_CurrentLoan: React.FC<Props> = ({ appState, setAppState, calculations
             </div>
         }>
           <div className="space-y-4">
-            {people.map((person, index) => (
+            {(people || []).map((person, index) => (
               <div key={person.id} className="flex gap-4 items-center">
                 <div className="p-3 bg-[var(--input-bg-color)] rounded-full text-[var(--title-color)]">
                     <UsersIcon className="h-6 w-6"/>
