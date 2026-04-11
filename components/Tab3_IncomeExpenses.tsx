@@ -701,10 +701,84 @@ const Tab3_IncomeExpenses: React.FC<Props> = ({ appState, setAppState, calculati
         addCategory("Soft Expenses", "SOFT EXPENSES", "softExpenses");
         addCategory("Hard Expenses", "HARD EXPENSES", "hardExpenses");
 
-        setAppState(prev => ({
-            ...prev,
-            expenses: [...(prev.expenses || []), ...newExpenses]
-        }));
+        const incomesData = details["Incomes"] || details["incomes"];
+        const newIncomes: IncomeItem[] = [];
+        if (incomesData) {
+            Object.entries(incomesData).forEach(([name, val]) => {
+                const { amount, frequency } = parseAmount(val as string | number);
+                newIncomes.push({
+                    id: idCounter++,
+                    name,
+                    amount,
+                    frequency: frequency as any
+                });
+            });
+        }
+        
+        const person1Name = details["Person 1"] || details["person1"];
+        const person2Name = details["Person 2"] || details["person2"];
+        const email = details["Email"] || details["email"] || details["emailAddress"] || details["clientEmail"] || details["Client Email"];
+
+        setAppState(prev => {
+            const mergedExpenses = [...(prev.expenses || [])];
+            newExpenses.forEach(newExp => {
+                const existingIndex = mergedExpenses.findIndex(ex => 
+                    ex.name.toLowerCase() === newExp.name.toLowerCase() && 
+                    ex.category === newExp.category
+                );
+                if (existingIndex >= 0) {
+                    mergedExpenses[existingIndex] = {
+                        ...mergedExpenses[existingIndex],
+                        amount: newExp.amount,
+                        frequency: newExp.frequency
+                    };
+                } else {
+                    mergedExpenses.push(newExp);
+                }
+            });
+
+            const mergedIncomes = [...(prev.incomes || [])];
+            newIncomes.forEach(newInc => {
+                const existingIndex = mergedIncomes.findIndex(inc => 
+                    inc.name.toLowerCase() === newInc.name.toLowerCase()
+                );
+                if (existingIndex >= 0) {
+                    mergedIncomes[existingIndex] = {
+                        ...mergedIncomes[existingIndex],
+                        amount: newInc.amount,
+                        frequency: newInc.frequency
+                    };
+                } else {
+                    mergedIncomes.push(newInc);
+                }
+            });
+
+            const newPeople = [...(prev.people || [])];
+            if (person1Name) {
+                if (newPeople.length >= 1) newPeople[0].name = person1Name;
+                else newPeople.push({ id: 1, name: person1Name, age: 30 });
+            }
+            if (person2Name) {
+                if (newPeople.length >= 2) newPeople[1].name = person2Name;
+                else if (newPeople.length === 1) newPeople.push({ id: 2, name: person2Name, age: 30 });
+            }
+
+            let finalEmail = email || prev.clientEmail;
+            if (!email && file.name.includes('@')) {
+               const potentialEmail = file.name.replace('.json', '');
+               if (potentialEmail.includes('@')) {
+                   finalEmail = potentialEmail;
+               }
+            }
+
+            return {
+                ...prev,
+                expenses: mergedExpenses,
+                incomes: newIncomes.length > 0 ? mergedIncomes : prev.incomes,
+                people: newPeople.length > 0 ? newPeople : prev.people,
+                clientEmail: finalEmail || prev.clientEmail
+            };
+        });
         
         // Reset file input
         event.target.value = '';
