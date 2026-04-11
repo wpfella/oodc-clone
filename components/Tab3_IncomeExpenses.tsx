@@ -652,9 +652,9 @@ const Tab3_IncomeExpenses: React.FC<Props> = ({ appState, setAppState, calculati
     reader.onload = (e) => {
       try {
         const json = JSON.parse(e.target?.result as string);
-        const details = json?.["Form Field Details"];
+        const details = json?.["Form Field Details"] || json?.["formFieldDetails"];
         if (!details) {
-            throw new Error("Invalid Expenses JSON format - missing 'Form Field Details'");
+            throw new Error("Invalid Expenses JSON format - missing 'Form Field Details' or 'formFieldDetails'");
         }
 
         const newExpenses: ExpenseItem[] = [];
@@ -679,24 +679,27 @@ const Tab3_IncomeExpenses: React.FC<Props> = ({ appState, setAppState, calculati
             return { amount, frequency };
         };
 
-        const addCategory = (catName: string, targetCategory: ExpenseItem['category']) => {
-            if (details[catName]) {
-                Object.entries(details[catName]).forEach(([name, val]) => {
-                    const { amount, frequency } = parseAmount(val as string | number);
-                    newExpenses.push({
-                        id: idCounter++,
-                        name,
-                        amount,
-                        category: targetCategory,
-                        frequency: frequency as any
+        const addCategory = (targetCategory: ExpenseItem['category'], ...catNames: string[]) => {
+            for (const catName of catNames) {
+                if (details[catName]) {
+                    Object.entries(details[catName]).forEach(([name, val]) => {
+                        const { amount, frequency } = parseAmount(val as string | number);
+                        newExpenses.push({
+                            id: idCounter++,
+                            name,
+                            amount,
+                            category: targetCategory,
+                            frequency: frequency as any
+                        });
                     });
-                });
+                    break;
+                }
             }
         };
 
-        addCategory("FOOD FUN FUEL", "FFF");
-        addCategory("SOFT EXPENSES", "Soft Expenses");
-        addCategory("HARD EXPENSES", "Hard Expenses");
+        addCategory("FFF", "FOOD FUN FUEL", "foodFunFuel");
+        addCategory("Soft Expenses", "SOFT EXPENSES", "softExpenses");
+        addCategory("Hard Expenses", "HARD EXPENSES", "hardExpenses");
 
         setAppState(prev => ({
             ...prev,
