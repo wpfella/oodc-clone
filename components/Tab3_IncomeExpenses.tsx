@@ -667,7 +667,7 @@ const Tab3_IncomeExpenses: React.FC<Props> = ({ appState, setAppState, calculati
         const amount = parseFloat(amountStr) || 0;
         let frequency = 'monthly';
         if (parts.length > 1) {
-            const freqStr = parts[1];
+            const freqStr = parts.slice(1).join(' ');
             if (freqStr.includes('week')) frequency = 'weekly';
             else if (freqStr.includes('fortnight')) frequency = 'fortnightly';
             else if (freqStr.includes('month')) frequency = 'monthly';
@@ -751,7 +751,7 @@ const Tab3_IncomeExpenses: React.FC<Props> = ({ appState, setAppState, calculati
             }
         });
 
-        const newPeople = [...(prev.people || [])];
+        const newPeople = prev.people ? prev.people.map(p => ({...p})) : [];
         if (person1Name) {
             if (newPeople.length >= 1) newPeople[0].name = person1Name;
             else newPeople.push({ id: 1, name: person1Name, age: 30 });
