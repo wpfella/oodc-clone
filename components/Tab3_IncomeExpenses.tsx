@@ -1,5 +1,6 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
+import { GoogleGenAI } from '@google/genai';
+import Modal from './common/Modal';
 import { AppState, IncomeItem, ExpenseItem, FutureChange, FutureLumpSum, LoanDetails, LoanSummary } from '../types';
 import Card from './common/Card';
 import Tooltip from './common/Tooltip';
@@ -622,6 +623,10 @@ const Tab3_IncomeExpenses: React.FC<Props> = ({ appState, setAppState, calculati
   const activeInvestmentCashflow = investmentCashflowScenario === 'crown' ? crownInvestmentNetCashflow : bankInvestmentNetCashflow;
   const activeSurplus = investmentCashflowScenario === 'crown' ? crownSurplus : bankSurplus;
 
+  const [isCopyExpensesOpen, setIsCopyExpensesOpen] = useState(false);
+  const [copyExpensesText, setCopyExpensesText] = useState("");
+  const [isParsingAI, setIsParsingAI] = useState(false);
+
   const handleListChange = <T,>(list: T[], setList: (list: T[]) => void, index: number, field: keyof T, value: any) => {
     const newList = [...list];
     const item = newList[index];
@@ -644,6 +649,136 @@ const Tab3_IncomeExpenses: React.FC<Props> = ({ appState, setAppState, calculati
     setList(list.filter(item => item.id !== id));
   };
   
+  const processExtractedJson = (json: any, metadataFileName?: string) => {
+    const details = json?.["Form Field Details"] || json?.["formFieldDetails"];
+    if (!details) {
+        throw new Error("Invalid Expenses JSON format - missing 'Form Field Details' or 'formFieldDetails'");
+    }
+
+    const newExpenses: ExpenseItem[] = [];
+    let idCounter = Date.now();
+
+    const parseAmount = (val: string | number): {amount: number, frequency: any} => {
+        if (typeof val === 'number') return { amount: val, frequency: 'monthly' };
+        if (!val) return { amount: 0, frequency: 'monthly' };
+        
+        const parts = String(val).toLowerCase().trim().split(' ');
+        const amountStr = parts[0].replace(/[^0-9.]/g, '');
+        const amount = parseFloat(amountStr) || 0;
+        let frequency = 'monthly';
+        if (parts.length > 1) {
+            const freqStr = parts[1];
+            if (freqStr.includes('week')) frequency = 'weekly';
+            else if (freqStr.includes('fortnight')) frequency = 'fortnightly';
+            else if (freqStr.includes('month')) frequency = 'monthly';
+            else if (freqStr.includes('quarter')) frequency = 'quarterly';
+            else if (freqStr.includes('annual') || freqStr.includes('year')) frequency = 'annually';
+        }
+        return { amount, frequency };
+    };
+
+    const addCategory = (targetCategory: ExpenseItem['category'], ...catNames: string[]) => {
+        for (const catName of catNames) {
+            if (details[catName]) {
+                Object.entries(details[catName]).forEach(([name, val]) => {
+                    const { amount, frequency } = parseAmount(val as string | number);
+                    newExpenses.push({
+                        id: idCounter++,
+                        name,
+                        amount,
+                        category: targetCategory,
+                        frequency: frequency as any
+                    });
+                });
+                break;
+            }
+        }
+    };
+
+    addCategory("FFF", "FOOD FUN FUEL", "foodFunFuel", "FFF");
+    addCategory("Soft Expenses", "SOFT EXPENSES", "softExpenses", "Soft Expenses");
+    addCategory("Hard Expenses", "HARD EXPENSES", "hardExpenses", "Hard Expenses");
+
+    const incomesData = details["Incomes"] || details["incomes"];
+    const newIncomes: IncomeItem[] = [];
+    if (incomesData) {
+        Object.entries(incomesData).forEach(([name, val]) => {
+            const { amount, frequency } = parseAmount(val as string | number);
+            newIncomes.push({
+                id: idCounter++,
+                name,
+                amount,
+                frequency: frequency as any
+            });
+        });
+    }
+    
+    const person1Name = details["Person 1"] || details["person1"];
+    const person2Name = details["Person 2"] || details["person2"];
+    const email = details["Email"] || details["email"] || details["emailAddress"] || details["clientEmail"] || details["Client Email"];
+
+    setAppState(prev => {
+        const mergedExpenses = [...(prev.expenses || [])];
+        newExpenses.forEach(newExp => {
+            const existingIndex = mergedExpenses.findIndex(ex => 
+                ex.name.toLowerCase() === newExp.name.toLowerCase() && 
+                ex.category === newExp.category
+            );
+            if (existingIndex >= 0) {
+                mergedExpenses[existingIndex] = {
+                    ...mergedExpenses[existingIndex],
+                    amount: newExp.amount,
+                    frequency: newExp.frequency
+                };
+            } else {
+                mergedExpenses.push(newExp);
+            }
+        });
+
+        const mergedIncomes = [...(prev.incomes || [])];
+        newIncomes.forEach(newInc => {
+            const existingIndex = mergedIncomes.findIndex(inc => 
+                inc.name.toLowerCase() === newInc.name.toLowerCase()
+            );
+            if (existingIndex >= 0) {
+                mergedIncomes[existingIndex] = {
+                    ...mergedIncomes[existingIndex],
+                    amount: newInc.amount,
+                    frequency: newInc.frequency
+                };
+            } else {
+                mergedIncomes.push(newInc);
+            }
+        });
+
+        const newPeople = [...(prev.people || [])];
+        if (person1Name) {
+            if (newPeople.length >= 1) newPeople[0].name = person1Name;
+            else newPeople.push({ id: 1, name: person1Name, age: 30 });
+        }
+        if (person2Name) {
+            if (newPeople.length >= 2) newPeople[1].name = person2Name;
+            else if (newPeople.length === 1) newPeople.push({ id: 2, name: person2Name, age: 30 });
+        }
+
+        let finalEmail = email || prev.clientEmail;
+        if (!email && metadataFileName && metadataFileName.includes('@')) {
+           const potentialEmail = metadataFileName.replace('.json', '');
+           if (potentialEmail.includes('@')) {
+               finalEmail = potentialEmail;
+           }
+        }
+
+        return {
+            ...prev,
+            expenses: mergedExpenses,
+            incomes: newIncomes.length > 0 ? mergedIncomes : prev.incomes,
+            people: newPeople.length > 0 ? newPeople : prev.people,
+            clientEmail: finalEmail || prev.clientEmail
+        };
+    });
+  };
+
   const handleImportExpenses = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -652,133 +787,7 @@ const Tab3_IncomeExpenses: React.FC<Props> = ({ appState, setAppState, calculati
     reader.onload = (e) => {
       try {
         const json = JSON.parse(e.target?.result as string);
-        const details = json?.["Form Field Details"] || json?.["formFieldDetails"];
-        if (!details) {
-            throw new Error("Invalid Expenses JSON format - missing 'Form Field Details' or 'formFieldDetails'");
-        }
-
-        const newExpenses: ExpenseItem[] = [];
-        let idCounter = Date.now();
-
-        const parseAmount = (val: string | number): {amount: number, frequency: any} => {
-            if (typeof val === 'number') return { amount: val, frequency: 'monthly' };
-            if (!val) return { amount: 0, frequency: 'monthly' };
-            
-            const parts = String(val).toLowerCase().trim().split(' ');
-            const amountStr = parts[0].replace(/[^0-9.]/g, '');
-            const amount = parseFloat(amountStr) || 0;
-            let frequency = 'monthly';
-            if (parts.length > 1) {
-                const freqStr = parts[1];
-                if (freqStr.includes('week')) frequency = 'weekly';
-                else if (freqStr.includes('fortnight')) frequency = 'fortnightly';
-                else if (freqStr.includes('month')) frequency = 'monthly';
-                else if (freqStr.includes('quarter')) frequency = 'quarterly';
-                else if (freqStr.includes('annual') || freqStr.includes('year')) frequency = 'annually';
-            }
-            return { amount, frequency };
-        };
-
-        const addCategory = (targetCategory: ExpenseItem['category'], ...catNames: string[]) => {
-            for (const catName of catNames) {
-                if (details[catName]) {
-                    Object.entries(details[catName]).forEach(([name, val]) => {
-                        const { amount, frequency } = parseAmount(val as string | number);
-                        newExpenses.push({
-                            id: idCounter++,
-                            name,
-                            amount,
-                            category: targetCategory,
-                            frequency: frequency as any
-                        });
-                    });
-                    break;
-                }
-            }
-        };
-
-        addCategory("FFF", "FOOD FUN FUEL", "foodFunFuel");
-        addCategory("Soft Expenses", "SOFT EXPENSES", "softExpenses");
-        addCategory("Hard Expenses", "HARD EXPENSES", "hardExpenses");
-
-        const incomesData = details["Incomes"] || details["incomes"];
-        const newIncomes: IncomeItem[] = [];
-        if (incomesData) {
-            Object.entries(incomesData).forEach(([name, val]) => {
-                const { amount, frequency } = parseAmount(val as string | number);
-                newIncomes.push({
-                    id: idCounter++,
-                    name,
-                    amount,
-                    frequency: frequency as any
-                });
-            });
-        }
-        
-        const person1Name = details["Person 1"] || details["person1"];
-        const person2Name = details["Person 2"] || details["person2"];
-        const email = details["Email"] || details["email"] || details["emailAddress"] || details["clientEmail"] || details["Client Email"];
-
-        setAppState(prev => {
-            const mergedExpenses = [...(prev.expenses || [])];
-            newExpenses.forEach(newExp => {
-                const existingIndex = mergedExpenses.findIndex(ex => 
-                    ex.name.toLowerCase() === newExp.name.toLowerCase() && 
-                    ex.category === newExp.category
-                );
-                if (existingIndex >= 0) {
-                    mergedExpenses[existingIndex] = {
-                        ...mergedExpenses[existingIndex],
-                        amount: newExp.amount,
-                        frequency: newExp.frequency
-                    };
-                } else {
-                    mergedExpenses.push(newExp);
-                }
-            });
-
-            const mergedIncomes = [...(prev.incomes || [])];
-            newIncomes.forEach(newInc => {
-                const existingIndex = mergedIncomes.findIndex(inc => 
-                    inc.name.toLowerCase() === newInc.name.toLowerCase()
-                );
-                if (existingIndex >= 0) {
-                    mergedIncomes[existingIndex] = {
-                        ...mergedIncomes[existingIndex],
-                        amount: newInc.amount,
-                        frequency: newInc.frequency
-                    };
-                } else {
-                    mergedIncomes.push(newInc);
-                }
-            });
-
-            const newPeople = [...(prev.people || [])];
-            if (person1Name) {
-                if (newPeople.length >= 1) newPeople[0].name = person1Name;
-                else newPeople.push({ id: 1, name: person1Name, age: 30 });
-            }
-            if (person2Name) {
-                if (newPeople.length >= 2) newPeople[1].name = person2Name;
-                else if (newPeople.length === 1) newPeople.push({ id: 2, name: person2Name, age: 30 });
-            }
-
-            let finalEmail = email || prev.clientEmail;
-            if (!email && file.name.includes('@')) {
-               const potentialEmail = file.name.replace('.json', '');
-               if (potentialEmail.includes('@')) {
-                   finalEmail = potentialEmail;
-               }
-            }
-
-            return {
-                ...prev,
-                expenses: mergedExpenses,
-                incomes: newIncomes.length > 0 ? mergedIncomes : prev.incomes,
-                people: newPeople.length > 0 ? newPeople : prev.people,
-                clientEmail: finalEmail || prev.clientEmail
-            };
-        });
+        processExtractedJson(json, file.name);
         
         // Reset file input
         event.target.value = '';
@@ -788,6 +797,67 @@ const Tab3_IncomeExpenses: React.FC<Props> = ({ appState, setAppState, calculati
       }
     };
     reader.readAsText(file);
+  };
+
+  const handleCopyExpensesAI = async () => {
+    if (!copyExpensesText.trim()) return;
+    setIsParsingAI(true);
+    try {
+        // first check if it's already pure json
+        let parsed = null;
+        try {
+            parsed = JSON.parse(copyExpensesText);
+        } catch(e) {}
+        
+        if (parsed && (parsed["Form Field Details"] || parsed["formFieldDetails"])) {
+            processExtractedJson(parsed);
+            setIsCopyExpensesOpen(false);
+            setCopyExpensesText("");
+            return;
+        }
+
+        // if it's not valid json, use AI to extract
+        // we use any here to prevent TS errors on env variables that may or may not exist depending on the runtime
+        const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || (process as any).env?.API_KEY;
+        const ai = new GoogleGenAI({ apiKey });
+        const systemMsg = `You are a financial data extraction tool. Extract all incomes, living expenses, and personal details from the provided text into the EXACT JSON format below. Do not output anything other than pure JSON without markdown or backticks formatting.
+
+{
+"Form Field Details": {
+  "Incomes": { "Income Source 1": "xxxx monthly", "Income Source 2": "yyyy weekly" },
+  "FFF": { "Food": "xxx weekly", "Fun": "xxx weekly", "Fuel": "xxx weekly" },
+  "Hard Expenses": { "Item 1": "xxx monthly", "Item 2": "yyy annually" },
+  "Soft Expenses": { "Item 1": "xxx monthly" },
+  "Person 1": "First Last",
+  "Person 2": "First Last",
+  "Email": "email@example.com"
+}
+}
+
+Use frequencies matching exactly one of: weekly, fortnightly, monthly, quarterly, annually. Try to accurately map standard household expenses into either 'FFF', 'Hard Expenses', or 'Soft Expenses'.`;
+
+        const result = await ai.models.generateContent({
+            model: 'gemini-2.5-pro',
+            contents: `${systemMsg}\nText to parse:\n${copyExpensesText}`
+        });
+        
+        let resultText = (result.text || "").trim();
+        if (resultText.startsWith("\`\`\`json")) {
+            resultText = resultText.replace(/^\`\`\`json/i, '').replace(/\`\`\`$/i, '').trim();
+        } else if (resultText.startsWith("\`\`\`")) {
+            resultText = resultText.replace(/^\`\`\`/i, '').replace(/\`\`\`$/i, '').trim();
+        }
+        
+        const aiParsed = JSON.parse(resultText);
+        processExtractedJson(aiParsed);
+        setIsCopyExpensesOpen(false);
+        setCopyExpensesText("");
+    } catch(e: any) {
+        console.error("AI Extration Error", e);
+        alert("Failed to parse the expenses using AI. Please modify the input text or ensure it matches the correct JSON format. Error: " + e.message);
+    } finally {
+        setIsParsingAI(false);
+    }
   };
 
   const formatCurrency = (value: number, digits = 0) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value);
@@ -913,18 +983,27 @@ const Tab3_IncomeExpenses: React.FC<Props> = ({ appState, setAppState, calculati
         <Card title={
             <div className="flex justify-between items-center w-full">
                 <span>Expenses</span>
-                <div className="relative overflow-hidden inline-block group">
-                    <button className="px-3 py-1.5 text-xs font-bold text-[#5B21B6] bg-[#5B21B6]/10 rounded-lg border border-[#5B21B6]/20 group-hover:bg-[#5B21B6] group-hover:text-white transition-all print:hidden uppercase tracking-widest flex items-center gap-2">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                        Import JSON
+                <div className="flex items-center gap-2">
+                    <button 
+                        onClick={() => setIsCopyExpensesOpen(true)}
+                        className="px-3 py-1.5 text-xs font-bold text-emerald-600 bg-emerald-600/10 rounded-lg border border-emerald-600/20 hover:bg-emerald-600 hover:text-white transition-all print:hidden uppercase tracking-widest flex items-center gap-2"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
+                        Copy Expenses
                     </button>
-                    <input 
-                        type="file" 
-                        accept=".json" 
-                        onChange={handleImportExpenses}
-                        className="absolute w-full h-full inset-0 opacity-0 cursor-pointer"
-                        title="Upload Expenses JSON Scenario"
-                    />
+                    <div className="relative overflow-hidden inline-block group">
+                        <button className="px-3 py-1.5 text-xs font-bold text-[#5B21B6] bg-[#5B21B6]/10 rounded-lg border border-[#5B21B6]/20 group-hover:bg-[#5B21B6] group-hover:text-white transition-all print:hidden uppercase tracking-widest flex items-center gap-2">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                            Import JSON
+                        </button>
+                        <input 
+                            type="file" 
+                            accept=".json" 
+                            onChange={handleImportExpenses}
+                            className="absolute w-full h-full inset-0 opacity-0 cursor-pointer"
+                            title="Upload Expenses JSON Scenario"
+                        />
+                    </div>
                 </div>
             </div>
         }>
@@ -1080,6 +1159,33 @@ const Tab3_IncomeExpenses: React.FC<Props> = ({ appState, setAppState, calculati
             <button onClick={handleAddFutureLumpSum} className="mt-4 text-sm text-[var(--title-color)] hover:opacity-80 transition-opacity font-semibold print:hidden">+ Add Lump Sum Event</button>
         </Card>
       </div>
+
+      <Modal isOpen={isCopyExpensesOpen} onClose={() => setIsCopyExpensesOpen(false)} title="Copy Raw Text or JSON">
+        <div className="space-y-4">
+            <p className="text-sm text-slate-500">Paste raw text or JSON data below. The system will use AI to automatically interpret and populate incomes and expenses, frequencies, and client details into the app.</p>
+            <textarea
+                value={copyExpensesText}
+                onChange={(e) => setCopyExpensesText(e.target.value)}
+                className="w-full h-64 p-3 font-mono text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                placeholder="Paste financial details here... e.g.&#10;Food: 300 weekly&#10;Incomes: John earns 5000 monthly..."
+            />
+            <div className="flex justify-end gap-2">
+                <button
+                    onClick={() => { setIsCopyExpensesOpen(false); setCopyExpensesText(""); }}
+                    className="px-4 py-2 text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                >
+                    Cancel
+                </button>
+                <button
+                    onClick={handleCopyExpensesAI}
+                    disabled={!copyExpensesText.trim() || isParsingAI}
+                    className="px-4 py-2 text-sm font-black text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 uppercase tracking-widest"
+                >
+                    {isParsingAI ? 'Populating...' : 'Populate Details'}
+                </button>
+            </div>
+        </div>
+      </Modal>
     </div>
   );
 };
