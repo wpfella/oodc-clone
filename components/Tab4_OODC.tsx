@@ -317,6 +317,12 @@ const Tab4_OODC: React.FC<Props> = ({ appState, setAppState, calculations }) => 
                     <p>Your <strong>Bank Surplus</strong> is positive ({formatCurrency(bankSurplus)}), but your <strong>Crown Surplus</strong> is negative ({formatCurrency(crownSurplus)}).</p>
                     <p className="font-semibold">Check Investment Property Target Repayments.</p>
                 </div>
+            ) : crownSurplus > 0 ? (
+                <div className="mt-2 space-y-2">
+                    <p>Your <strong>Crown Surplus</strong> is positive ({formatCurrency(crownSurplus)}), but it is not enough to cover the monthly interest on your total consolidated debt.</p>
+                    <p className="text-sm">The minimum monthly interest calculation is approximately <strong>{formatCurrency(((loan.amount + (appState.otherDebts || []).reduce((s, d) => s + d.amount, 0) - (loan.offsetBalance || 0)) * (appState.crownMoneyInterestRate / 100)) / 12)}</strong>.</p>
+                    <p className="font-semibold">To see a viable scenario, you must either increase income, decrease expenses, or increase the starting offset balance.</p>
+                </div>
             ) : (
                 <p>Monthly expenses exceed income. Please review your budget.</p>
             )}

@@ -52,9 +52,15 @@ const SliderInput: React.FC<SliderInputProps> = ({
 
   const handleBlur = () => {
     if (inputValue === '') {
-      setInputValue('0');
+      const boundedVal = Math.max(min, Math.min(max, 0));
+      setInputValue(boundedVal.toString());
+      onChange(boundedVal);
     } else {
-      setInputValue(parseFloat(inputValue).toString());
+      let parsed = parseFloat(inputValue);
+      if (isNaN(parsed)) parsed = min;
+      const boundedVal = Math.max(min, Math.min(max, parsed));
+      setInputValue(boundedVal.toString());
+      onChange(boundedVal);
     }
   };
 

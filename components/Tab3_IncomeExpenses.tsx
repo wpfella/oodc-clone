@@ -1121,21 +1121,36 @@ Use frequencies matching exactly one of: weekly, fortnightly, monthly, quarterly
 
                 <hr className="border-[var(--border-color)] border-dashed my-2" />
 
-                <div className="flex justify-between items-center p-2 rounded-lg" style={{ backgroundColor: 'var(--color-negative-bg)' }}>
-                    <span className="font-medium" style={{ color: 'var(--color-negative-text)' }}>Home Loan Repayment</span>
-                    <span className="font-semibold" style={{ color: 'var(--color-negative-text)' }}>{formatCurrency(monthlyLoanRepayment)}</span>
-                </div>
-                 <div>
-                    <div className="flex justify-between items-center p-3 rounded-lg border-2" style={{ borderColor: netMonthlyCashflow >= 0 ? 'var(--color-positive-text)' : 'var(--color-negative-text)' }}>
-                        <div className="flex items-center gap-2">
-                            <span className="font-bold text-base" style={{ color: 'var(--text-color)' }}>Leftover Cashflow ({investmentCashflowScenario === 'crown' ? 'Strategy' : 'Bank'})</span>
-                            <Tooltip text="This shows your leftover cashflow each month after all living expenses and home loan repayments.">
-                                <InfoIcon className="h-4 w-4 text-[var(--text-color)] print:hidden"/>
-                            </Tooltip>
+                {investmentCashflowScenario === 'bank' ? (
+                    <>
+                        <div className="flex justify-between items-center p-2 rounded-lg" style={{ backgroundColor: 'var(--color-negative-bg)' }}>
+                            <span className="font-medium" style={{ color: 'var(--color-negative-text)' }}>Home Loan Repayment</span>
+                            <span className="font-semibold" style={{ color: 'var(--color-negative-text)' }}>{formatCurrency(monthlyLoanRepayment)}</span>
                         </div>
-                        <span className="font-extrabold text-2xl" style={{ color: netMonthlyCashflow >= 0 ? 'var(--color-positive-text)' : 'var(--color-negative-text)' }}>{formatCurrency(netMonthlyCashflow)}</span>
+                        <div>
+                            <div className="flex justify-between items-center p-3 rounded-lg border-2" style={{ borderColor: netMonthlyCashflow >= 0 ? 'var(--color-positive-text)' : 'var(--color-negative-text)' }}>
+                                <div className="flex items-center gap-2">
+                                    <span className="font-bold text-base" style={{ color: 'var(--text-color)' }}>Leftover Cashflow (Bank)</span>
+                                    <Tooltip text="This shows your leftover cashflow each month after all living expenses and home loan repayments.">
+                                        <InfoIcon className="h-4 w-4 text-[var(--text-color)] print:hidden"/>
+                                    </Tooltip>
+                                </div>
+                                <span className="font-extrabold text-2xl" style={{ color: netMonthlyCashflow >= 0 ? 'var(--color-positive-text)' : 'var(--color-negative-text)' }}>{formatCurrency(netMonthlyCashflow)}</span>
+                            </div>
+                        </div>
+                    </>
+                ) : (
+                    <div>
+                        <div className="flex flex-col gap-2 p-3 rounded-lg border-2 border-[var(--color-surplus-text)] bg-[var(--color-surplus-bg)]/20 shadow-sm text-center">
+                            <span className="font-bold text-base" style={{ color: 'var(--color-surplus-text)' }}>
+                                Crown Strategy Target Repayment: {formatCurrency(activeSurplus)}
+                            </span>
+                            <span className="text-sm" style={{ color: 'var(--text-color-muted)' }}>
+                                Under the Crown Money strategy, <strong>all Surplus money</strong> is directly channelled into your main loan. There is no "Leftover" cash flow because every dollar is working for you.
+                            </span>
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
         </Card>
          <Card title={<PlannedChangesCardTitle />}>
