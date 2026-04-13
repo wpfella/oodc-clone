@@ -92,23 +92,23 @@ const DebtConsolidationSection: React.FC<Props> = ({ appState, setAppState }) =>
                                     </div>
                                      <div>
                                         <label className="block text-[10px] font-black uppercase tracking-widest text-[var(--text-color-muted)] mb-1">Amount Owing</label>
-                                        <input type="number" value={debt.amount} onChange={e => handleDebtChange(debt.id, 'amount', parseFloat(e.target.value) || 0)} className={inputClasses} placeholder="Amount"/>
+                                        <input type="number" step="1" value={debt.amount} onChange={e => handleDebtChange(debt.id, 'amount', parseFloat(e.target.value) || 0)} className={inputClasses} placeholder="Amount"/>
                                     </div>
                                 </div>
                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-[10px] font-black uppercase tracking-widest text-[var(--text-color-muted)] mb-1">Interest Rate (%)</label>
-                                        <input type="number" value={debt.interestRate} onChange={e => handleDebtChange(debt.id, 'interestRate', parseFloat(e.target.value) || 0)} className={inputClasses}/>
+                                        <input type="number" step="0.01" value={debt.interestRate} onChange={e => handleDebtChange(debt.id, 'interestRate', parseFloat(e.target.value) || 0)} className={inputClasses}/>
                                     </div>
                                     <div>
                                         <label className="block text-[10px] font-black uppercase tracking-widest text-[var(--text-color-muted)] mb-1">Remaining Term (Years)</label>
-                                        <input type="number" value={debt.remainingTerm} onChange={e => handleDebtChange(debt.id, 'remainingTerm', parseFloat(e.target.value) || 0)} className={inputClasses}/>
+                                        <input type="number" step="1" value={debt.remainingTerm} onChange={e => handleDebtChange(debt.id, 'remainingTerm', parseFloat(e.target.value) || 0)} className={inputClasses}/>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                    <div>
                                         <label className="block text-[10px] font-black uppercase tracking-widest text-[var(--text-color-muted)] mb-1">Repayment</label>
-                                        <input type="number" value={debt.repayment} onChange={e => handleDebtChange(debt.id, 'repayment', parseFloat(e.target.value) || 0)} className={inputClasses}/>
+                                        <input type="number" step="1" value={debt.repayment} onChange={e => handleDebtChange(debt.id, 'repayment', parseFloat(e.target.value) || 0)} className={inputClasses}/>
                                     </div>
                                     <div>
                                         <label className="block text-[10px] font-black uppercase tracking-widest text-[var(--text-color-muted)] mb-1">Frequency</label>

@@ -117,7 +117,7 @@ const CrownRoadmap: React.FC<{ properties: any[] }> = ({ properties }) => {
                                             
                                             <div className="mt-6 pt-4 border-t border-slate-100 flex justify-between items-center">
                                                 <p className="text-[10px] font-black text-slate-400 uppercase">Interest Saving</p>
-                                                <p className="text-lg font-black text-emerald-600 tracking-tight">{formatCurrency(prop.interestSaved)}</p>
+                                                <p className={`text-lg font-black tracking-tight ${prop.interestSaved >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{formatCurrency(prop.interestSaved)}</p>
                                             </div>
                                         </div>
                                     </div>
@@ -188,7 +188,9 @@ const PropertyAttackAnalysisCard: React.FC<{
                         <div className="space-y-3">
                             <div className="flex justify-between items-center text-xs">
                                 <span className="text-slate-600 font-bold">Standard Household Surplus</span>
-                                <span className="font-black text-green-600">+{formatCurrency(householdSurplus)}</span>
+                                <span className={`font-black ${householdSurplus >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                    {householdSurplus > 0 ? '+' : ''}{formatCurrency(householdSurplus)}
+                                </span>
                             </div>
                             {freedUpRepayments > 0 && (
                                 <div className="flex justify-between items-center text-xs">
@@ -199,13 +201,15 @@ const PropertyAttackAnalysisCard: React.FC<{
                             {type === 'investment' && (
                                 <div className="flex justify-between items-center text-xs">
                                     <span className="text-slate-600 font-bold">Property Net Cashflow</span>
-                                    <span className="font-black text-green-600">+{formatCurrency(propertyNetCashflow)}</span>
+                                    <span className={`font-black ${propertyNetCashflow >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                        {propertyNetCashflow > 0 ? '+' : ''}{formatCurrency(propertyNetCashflow)}
+                                    </span>
                                 </div>
                             )}
                             <div className="pt-3 mt-1 border-t border-dashed border-slate-300 flex justify-between items-center">
                                 <span className="text-sm font-black text-slate-900">Total Monthly Attack</span>
                                 <div className="text-right">
-                                    <span className="text-xl font-black text-slate-900">{formatCurrency(totalAttack)}</span>
+                                    <span className={`text-xl font-black ${totalAttack >= 0 ? 'text-slate-900' : 'text-red-500'}`}>{formatCurrency(totalAttack)}</span>
                                     <span className="text-[10px] block font-bold text-slate-500">/mo</span>
                                 </div>
                             </div>
@@ -341,7 +345,7 @@ const Tab_InvestmentOODC: React.FC<Props> = ({ appState, setAppState, calculatio
         chartData: primaryChart,
         phaseColor: PHASE_COLORS[0],
         bankYears: bankLoanCalculation.termInYears,
-        interestSaved: Math.max(0, bankLoanCalculation.totalInterest - crownMoneyLoanCalculation.totalInterest)
+        interestSaved: bankLoanCalculation.totalInterest - crownMoneyLoanCalculation.totalInterest
     });
 
     cumulativeFreedUp += getMonthlyAmount(loan.repayment, loan.frequency);
@@ -394,7 +398,7 @@ const Tab_InvestmentOODC: React.FC<Props> = ({ appState, setAppState, calculatio
             chartData: attackPhaseChart,
             phaseColor: PHASE_COLORS[(idx + 1) % PHASE_COLORS.length],
             bankYears: inv.bank.termInYears,
-            interestSaved: Math.max(0, inv.bank.totalInterest - inv.crown.totalInterest)
+            interestSaved: inv.bank.totalInterest - inv.crown.totalInterest
         });
 
         cumulativeFreedUp += currentPropPayment;
@@ -572,14 +576,14 @@ const Tab_InvestmentOODC: React.FC<Props> = ({ appState, setAppState, calculatio
                     </td>
                     <td className="py-5 text-center text-slate-700 font-medium">{getExactDate(prop.bankYears)}</td>
                     <td className="py-5 text-center font-black text-indigo-700">{prop.debtFreeDate}</td>
-                    <td className="py-5 text-right font-black text-emerald-700 pr-4">{formatCurrency(prop.interestSaved)}</td>
+                    <td className={`py-5 text-right font-black pr-4 ${prop.interestSaved >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{formatCurrency(prop.interestSaved)}</td>
                   </tr>
                 ))}
                 <tr className="bg-emerald-50 border-t-2 border-emerald-200">
                   <td className="py-6 pl-4 font-black text-lg uppercase tracking-tight text-emerald-900">Portfolio Total</td>
                   <td className="py-6 text-center font-bold text-slate-700">{getExactDate(Math.max(...(individualPropertyData || []).map(p => p.bankYears)))}</td>
                   <td className="py-6 text-center font-black text-xl text-indigo-800">{getExactDate(totalDebtFreeYears)}</td>
-                  <td className="py-6 text-right font-black text-2xl text-emerald-800 pr-4">{formatCurrency(totalInterestSaved)}</td>
+                  <td className={`py-6 text-right font-black text-2xl pr-4 ${totalInterestSaved >= 0 ? 'text-emerald-800' : 'text-red-800'}`}>{formatCurrency(totalInterestSaved)}</td>
                 </tr>
               </tbody>
             </table>
