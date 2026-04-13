@@ -52,11 +52,11 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess, correctPassword }) => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const userEmail = result.user.email;
-      if (userEmail && (userEmail.endsWith('@crown.money') || userEmail.endsWith('@outofdebt.com.au'))) {
+      if (userEmail && userEmail.endsWith('@crown.money')) {
         onLoginSuccess();
       } else {
         await signOut(auth);
-        setError('Access restricted to @crown.money and @outofdebt.com.au accounts only.');
+        setError('Access restricted to @crown.money accounts only.');
       }
     } catch (err: any) {
       console.error('Google login error:', err);
@@ -76,8 +76,8 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess, correctPassword }) => {
     setError('');
     setMessage('');
 
-    if (!email.endsWith('@crown.money') && !email.endsWith('@outofdebt.com.au')) {
-      setError('Only @crown.money or @outofdebt.com.au email addresses are allowed.');
+    if (!email.endsWith('@crown.money')) {
+      setError('Only @crown.money email addresses are allowed.');
       setLoading(false);
       return;
     }

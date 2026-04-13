@@ -833,12 +833,12 @@ const App: React.FC = () => {
 
       <Modal isOpen={isLoadModalOpen} onClose={() => setIsLoadModalOpen(false)} title="Load or Manage Scenarios">
           <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-              {savedScenarios.length === 0 ? ( <p className="text-center text-sm text-[var(--text-color-muted)] py-8">No saved scenarios yet. Use the "Save" button to create one.</p> ) : (
+              {savedScenarios.filter(s => !s.isDeleted).length === 0 ? ( <p className="text-center text-sm text-[var(--text-color-muted)] py-8">No saved scenarios yet. Use the "Save" button to create one.</p> ) : (
                   <ul className="space-y-3">
-                      {(savedScenarios || []).map(scenario => (
+                      {(savedScenarios.filter(s => !s.isDeleted)).map(scenario => (
                           <li key={scenario.id} className="p-3 bg-black/10 dark:bg-white/5 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                              <div className="flex-grow">
-                                  <p className="font-semibold text-[var(--text-color)]">{scenario.name}</p>
+                              <div className="flex-grow min-w-0">
+                                  <p className="font-semibold text-[var(--text-color)] truncate" title={scenario.name}>{scenario.name}</p>
                                   <p className="text-xs text-[var(--text-color-muted)]">Last modified: {new Date(scenario.updatedAt).toLocaleString()}</p>
                               </div>
                               <div className="flex-shrink-0 flex items-center gap-2 flex-wrap">
